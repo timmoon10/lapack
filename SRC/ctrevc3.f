@@ -18,8 +18,9 @@
 *  Definition:
 *  ===========
 *
-*       SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N, T, LDT, VL, LDVL, VR,
-*                           LDVR, MM, M, WORK, LWORK, RWORK, LRWORK, INFO)
+*     SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N,
+*                          T, LDT, VL, LDVL, VR, LDVR,
+*                          MM, M, WORK, LWORK, INFO)
 *
 *       .. Scalar Arguments ..
 *       CHARACTER          HOWMNY, SIDE
@@ -27,8 +28,7 @@
 *       ..
 *       .. Array Arguments ..
 *       LOGICAL            SELECT( * )
-*       REAL   RWORK( * )
-*       COMPLEX         T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
+*       COMPLEX            T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
 *      $                   WORK( * )
 *       ..
 *
@@ -58,7 +58,7 @@
 *> Schur form T, then Q*X and Q*Y are the matrices of right and left
 *> eigenvectors of A.
 *>
-*> This uses a Level 3 BLAS version of the back transformation.
+*> This uses a blocked version of the algorithm.
 *> \endverbatim
 *
 *  Arguments:
@@ -182,29 +182,13 @@
 *> \verbatim
 *>          LWORK is INTEGER
 *>          The dimension of array WORK. LWORK >= max(1,2*N).
-*>          For optimum performance, LWORK >= N + 2*N*NB, where NB is
+*>          For optimum performance, LWORK >= 2*N*NB, where NB is
 *>          the optimal blocksize.
 *>
 *>          If LWORK = -1, then a workspace query is assumed; the routine
 *>          only calculates the optimal size of the WORK array, returns
 *>          this value as the first entry of the WORK array, and no error
 *>          message related to LWORK is issued by XERBLA.
-*> \endverbatim
-*>
-*> \param[out] RWORK
-*> \verbatim
-*>          RWORK is REAL array, dimension (LRWORK)
-*> \endverbatim
-*>
-*> \param[in] LRWORK
-*> \verbatim
-*>          LRWORK is INTEGER
-*>          The dimension of array RWORK. LRWORK >= max(1,N).
-*>
-*>          If LRWORK = -1, then a workspace query is assumed; the routine
-*>          only calculates the optimal size of the RWORK array, returns
-*>          this value as the first entry of the RWORK array, and no error
-*>          message related to LRWORK is issued by XERBLA.
 *> \endverbatim
 *>
 *> \param[out] INFO
@@ -224,8 +208,6 @@
 *
 *> \date November 2017
 *
-*  @generated from ztrevc3.f, fortran z -> c, Tue Apr 19 01:47:44 2016
-*
 *> \ingroup complexOTHERcomputational
 *
 *> \par Further Details:
@@ -233,9 +215,9 @@
 *>
 *> \verbatim
 *>
-*>  The algorithm used in this program is basically backward (forward)
-*>  substitution, with scaling to make the the code robust against
-*>  possible overflow.
+*>  The algorithm used in this program is basically blocked backward
+*>  (forward) substitution, with scaling to make the the code robust
+*>  against possible overflow.
 *>
 *>  Each eigenvector is normalized so that the element of largest
 *>  magnitude has magnitude 1; here the magnitude of a complex number
@@ -243,9 +225,10 @@
 *> \endverbatim
 *>
 *  =====================================================================
-      SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N, T, LDT, VL, LDVL, VR,
-     $                    LDVR, MM, M, WORK, LWORK, RWORK, LRWORK, INFO)
-      IMPLICIT NONE
+      SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N,
+     $                    T, LDT, VL, LDVL, VR, LDVR,
+     $                    MM, M, WORK, LWORK, INFO)
+     IMPLICIT NONE
 *
 *  -- LAPACK computational routine (version 3.8.0) --
 *  -- LAPACK is a software package provided by Univ. of Tennessee,    --
@@ -253,62 +236,63 @@
 *     November 2017
 *
 *     .. Scalar Arguments ..
-      CHARACTER          HOWMNY, SIDE
-      INTEGER            INFO, LDT, LDVL, LDVR, LWORK, LRWORK, M, MM, N
+      CHARACTER HOWMNY, SIDE
+      INTEGER   INFO, LDT, LDVL, LDVR, LWORK, M, MM, N
 *     ..
 *     .. Array Arguments ..
-      LOGICAL            SELECT( * )
-      REAL   RWORK( * )
-      COMPLEX         T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
-     $                   WORK( * )
+      LOGICAL   SELECT( * )
+      COMPLEX   T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ), WORK( N, * )
 *     ..
 *
 *  =====================================================================
 *
 *     .. Parameters ..
-      REAL   ZERO, ONE
-      PARAMETER          ( ZERO = 0.0E+0, ONE = 1.0E+0 )
-      COMPLEX         CZERO, CONE
-      PARAMETER          ( CZERO = ( 0.0E+0, 0.0E+0 ),
-     $                     CONE  = ( 1.0E+0, 0.0E+0 ) )
-      INTEGER            NBMIN, NBMAX
-      PARAMETER          ( NBMIN = 8, NBMAX = 128 )
+      REAL      ZERO, ONE, HALF
+      PARAMETER ( ZERO = 0.0E+0, ONE = 1.0E+0, HALF = 5.0E-1 )
+      COMPLEX   CZERO, CONE, CNONE
+      PARAMETER ( CZERO = ( 0.0E+0, 0.0E+0 ),
+     $            CONE  = ( 1.0E+0, 0.0E+0 ),
+     $            CNONE = ( -1.0E+0, 0.0E+0 ) )
+      INTEGER   NBMAX, MBMIN, MBMAX
+      PARAMETER ( NBMAX = 32, MBMIN = 8, MBMAX = 128 )
 *     ..
 *     .. Local Scalars ..
-      LOGICAL            ALLV, BOTHV, LEFTV, LQUERY, OVER, RIGHTV, SOMEV
-      INTEGER            I, II, IS, J, K, KI, IV, MAXWRK, NB
-      REAL   OVFL, REMAX, SCALE, SMIN, SMLNUM, ULP, UNFL
-      COMPLEX         CDUM
+      LOGICAL   LEFTV, RIGHTV, BACKTRANSFORM, SOMEV
+      REAL      UNFL, OVFL, ULP, SMLNUM, SCALE, BOUND, TNORM, VNORM
+      COMPLEX   CTEMP
+      CHARACTER NORMIN
+      INTEGER   I, IB, IBEND, IMAX, J, JV, JB, JOUT, JMAX, NB, MB
+*     ..
+*     .. Local Arrays ..
+      INTEGER   JLIST( NBMAX )
+      REAL      SCALES( NBMAX ), BOUNDS( NBMAX )
+      COMPLEX   SHIFTS( NBMAX ), DIAG( NBMAX )
 *     ..
 *     .. External Functions ..
-      LOGICAL            LSAME
-      INTEGER            ILAENV, ICAMAX
-      REAL   SLAMCH, SCASUM
-      EXTERNAL           LSAME, ILAENV, ICAMAX, SLAMCH, SCASUM
+      LOGICAL   LSAME
+      INTEGER   ILAENV
+      REAL      SLAMCH, SCASUM, CLANGE
+      EXTERNAL  LSAME, ILAENV, ICAMAX, SLAMCH, SCASUM, CLANGE
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           XERBLA, CCOPY, CLASET, CSSCAL, CGEMM, CGEMV,
-     $                   CLATRS, CLACPY, SLABAD
+      EXTERNAL  XERBLA, CSSCAL, CGEMM, CLATRS, SLABAD
 *     ..
 *     .. Intrinsic Functions ..
-      INTRINSIC          ABS, REAL, CMPLX, CONJG, AIMAG, MAX
+      INTRINSIC ABS, REAL, AIMAG, CMPLX, MIN, MAX
 *     ..
 *     .. Statement Functions ..
-      REAL   CABS1
+      REAL      CABS1
 *     ..
 *     .. Statement Function definitions ..
-      CABS1( CDUM ) = ABS( REAL( CDUM ) ) + ABS( AIMAG( CDUM ) )
+      CABS1( CTEMP ) = ABS( REAL( CTEMP ) ) + ABS( AIMAG( CTEMP ) )
 *     ..
 *     .. Executable Statements ..
 *
 *     Decode and test the input parameters
 *
-      BOTHV  = LSAME( SIDE, 'B' )
-      RIGHTV = LSAME( SIDE, 'R' ) .OR. BOTHV
-      LEFTV  = LSAME( SIDE, 'L' ) .OR. BOTHV
-*
-      ALLV  = LSAME( HOWMNY, 'A' )
-      OVER  = LSAME( HOWMNY, 'B' )
+      RIGHTV = LSAME( SIDE, 'R' ) .OR. LSAME( SIDE, 'B' )
+      LEFTV = LSAME( SIDE, 'L' ) .OR. LSAME( SIDE, 'B' )
+      BACKTRANSFORM = LSAME( HOWMNY, 'B' )
       SOMEV = LSAME( HOWMNY, 'S' )
 *
 *     Set M to the number of columns required to store the selected
@@ -325,14 +309,13 @@
       END IF
 *
       INFO = 0
-      NB = ILAENV( 1, 'CTREVC', SIDE // HOWMNY, N, -1, -1, -1 )
-      MAXWRK = N + 2*N*NB
-      WORK(1) = MAXWRK
-      RWORK(1) = N
-      LQUERY = ( LWORK.EQ.-1 .OR. LRWORK.EQ.-1 )
+      MB = ILAENV( 1, 'CTREVC', SIDE // HOWMNY, N, -1, -1, -1 )
+      WORK( 1, 1 ) = 2 * N * MB
       IF( .NOT.RIGHTV .AND. .NOT.LEFTV ) THEN
          INFO = -1
-      ELSE IF( .NOT.ALLV .AND. .NOT.OVER .AND. .NOT.SOMEV ) THEN
+      ELSE IF( .NOT.LSAME( HOWMNY, 'A' )
+     $         .AND. .NOT.BACKTRANSFORM
+     $         .AND. .NOT.SOMEV ) THEN
          INFO = -2
       ELSE IF( N.LT.0 ) THEN
          INFO = -4
@@ -344,15 +327,13 @@
          INFO = -10
       ELSE IF( MM.LT.M ) THEN
          INFO = -11
-      ELSE IF( LWORK.LT.MAX( 1, 2*N ) .AND. .NOT.LQUERY ) THEN
+      ELSE IF( LWORK.LT.MAX( 1, 2*N ) .AND. LWORK.NE.-1 ) THEN
          INFO = -14
-      ELSE IF ( LRWORK.LT.MAX( 1, N ) .AND. .NOT.LQUERY ) THEN
-         INFO = -16
       END IF
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'CTREVC3', -INFO )
          RETURN
-      ELSE IF( LQUERY ) THEN
+      ELSE IF( LWORK.EQ.-1 ) THEN
          RETURN
       END IF
 *
@@ -362,14 +343,11 @@
      $   RETURN
 *
 *     Use blocked version of back-transformation if sufficient workspace.
-*     Zero-out the workspace to avoid potential NaN propagation.
 *
-      IF( OVER .AND. LWORK .GE. N + 2*N*NBMIN ) THEN
-         NB = (LWORK - N) / (2*N)
-         NB = MIN( NB, NBMAX )
-         CALL CLASET( 'F', N, 1+2*NB, CZERO, CZERO, WORK, N )
+      IF( LWORK .GE. 2*N*MBMIN ) THEN
+         JMAX = MIN( LWORK / (2*N), NBMAX )
       ELSE
-         NB = 1
+         JMAX = 1
       END IF
 *
 *     Set the constants to control overflow.
@@ -379,251 +357,191 @@
       CALL SLABAD( UNFL, OVFL )
       ULP = SLAMCH( 'Precision' )
       SMLNUM = UNFL*( N / ULP )
+
 *
-*     Store the diagonal elements of T in working array WORK.
-*
-      DO 20 I = 1, N
-         WORK( I ) = T( I, I )
-   20 CONTINUE
-*
-*     Compute 1-norm of each column of strictly upper triangular
-*     part of T to control overflow in triangular solver.
-*
-      RWORK( 1 ) = ZERO
-      DO 30 J = 2, N
-         RWORK( J ) = SCASUM( J-1, T( 1, J ), 1 )
-   30 CONTINUE
+*     ----------------------------------------------------------
+*     Compute right eigenvectors
 *
       IF( RIGHTV ) THEN
+         JOUT = M
+         JB = 0
+         DO 20 JV = N, 1, -1
 *
-*        ============================================================
-*        Compute right eigenvectors.
+*           ----------------------------------------------------
+*           Set up workspace for current eigenvector if needed
 *
-*        IV is index of column in current block.
-*        Non-blocked version always uses IV=NB=1;
-*        blocked     version starts with IV=NB, goes down to 1.
-*        (Note the "0-th" column is used to store the original diagonal.)
-         IV = NB
-         IS = M
-         DO 80 KI = N, 1, -1
             IF( SOMEV ) THEN
-               IF( .NOT.SELECT( KI ) )
-     $            GO TO 80
-            END IF
-            SMIN = MAX( ULP*( CABS1( T( KI, KI ) ) ), SMLNUM )
-*
-*           --------------------------------------------------------
-*           Complex right eigenvector
-*
-            WORK( KI + IV*N ) = CONE
-*
-*           Form right-hand side.
-*
-            DO 40 K = 1, KI - 1
-               WORK( K + IV*N ) = -T( K, KI )
-   40       CONTINUE
-*
-*           Solve upper triangular system:
-*           [ T(1:KI-1,1:KI-1) - T(KI,KI) ]*X = SCALE*WORK.
-*
-            DO 50 K = 1, KI - 1
-               T( K, K ) = T( K, K ) - T( KI, KI )
-               IF( CABS1( T( K, K ) ).LT.SMIN )
-     $            T( K, K ) = SMIN
-   50       CONTINUE
-*
-            IF( KI.GT.1 ) THEN
-               CALL CLATRS( 'Upper', 'No transpose', 'Non-unit', 'Y',
-     $                      KI-1, T, LDT, WORK( 1 + IV*N ), SCALE,
-     $                      RWORK, INFO )
-               WORK( KI + IV*N ) = SCALE
-            END IF
-*
-*           Copy the vector x or Q*x to VR and normalize.
-*
-            IF( .NOT.OVER ) THEN
-*              ------------------------------
-*              no back-transform: copy x to VR and normalize.
-               CALL CCOPY( KI, WORK( 1 + IV*N ), 1, VR( 1, IS ), 1 )
-*
-               II = ICAMAX( KI, VR( 1, IS ), 1 )
-               REMAX = ONE / CABS1( VR( II, IS ) )
-               CALL CSSCAL( KI, REMAX, VR( 1, IS ), 1 )
-*
-               DO 60 K = KI + 1, N
-                  VR( K, IS ) = CZERO
-   60          CONTINUE
-*
-            ELSE IF( NB.EQ.1 ) THEN
-*              ------------------------------
-*              version 1: back-transform each vector with GEMV, Q*x.
-               IF( KI.GT.1 )
-     $            CALL CGEMV( 'N', N, KI-1, CONE, VR, LDVR,
-     $                        WORK( 1 + IV*N ), 1, CMPLX( SCALE ),
-     $                        VR( 1, KI ), 1 )
-*
-               II = ICAMAX( N, VR( 1, KI ), 1 )
-               REMAX = ONE / CABS1( VR( II, KI ) )
-               CALL CSSCAL( N, REMAX, VR( 1, KI ), 1 )
-*
+               SELECTV = SELECT( JV )
             ELSE
-*              ------------------------------
-*              version 2: back-transform block of vectors with GEMM
-*              zero out below vector
-               DO K = KI + 1, N
-                  WORK( K + IV*N ) = CZERO
-               END DO
-*
-*              Columns IV:NB of work are valid vectors.
-*              When the number of vectors stored reaches NB,
-*              or if this was last vector, do the GEMM
-               IF( (IV.EQ.1) .OR. (KI.EQ.1) ) THEN
-                  CALL CGEMM( 'N', 'N', N, NB-IV+1, KI+NB-IV, CONE,
-     $                        VR, LDVR,
-     $                        WORK( 1 + (IV)*N    ), N,
-     $                        CZERO,
-     $                        WORK( 1 + (NB+IV)*N ), N )
-*                 normalize vectors
-                  DO K = IV, NB
-                     II = ICAMAX( N, WORK( 1 + (NB+K)*N ), 1 )
-                     REMAX = ONE / CABS1( WORK( II + (NB+K)*N ) )
-                     CALL CSSCAL( N, REMAX, WORK( 1 + (NB+K)*N ), 1 )
-                  END DO
-                  CALL CLACPY( 'F', N, NB-IV+1,
-     $                         WORK( 1 + (NB+IV)*N ), N,
-     $                         VR( 1, KI ), LDVR )
-                  IV = NB
+               SELECTV = .TRUE.
+            END IF
+            IF( SELECTV ) THEN
+               IF( JB.EQ.0 ) THEN
+                  JB = JMAX
+                  IMAX = JV - 1
                ELSE
-                  IV = IV - 1
+                  JB = JB - 1
+               END IF
+               DO 30 I = 1, JV - 1
+                  WORK( I, JB ) = -T( I, JV )
+ 30            CONTINUE
+               DO 40 I = JV, IMAX
+                  WORK( I, JB ) = CZERO
+ 40            CONTINUE
+               JLIST( JB ) = JV
+               SHIFTS( JB ) = T( JV, JV )
+               BOUNDS( JB ) = SCASUM( JV - 1, WORK( 1, JB ), 1 )
+               IF( BOUNDS( JB ).GT.OVFL ) THEN
+                  SCALES( JB ) = HALF * OVFL / BOUNDS( JB )
+                  BOUNDS( JB ) = HALF * OVFL
+                  CALL CSSCAL( JV - 1, SCALES( JB ), WORK( 1, JB ), 1 )
+               ELSE
+                  SCALES( JB ) = ONE
                END IF
             END IF
 *
-*           Restore the original diagonal elements of T.
+*           ----------------------------------------------------
+*           Process workspace if needed
 *
-            DO 70 K = 1, KI - 1
-               T( K, K ) = WORK( K )
-   70       CONTINUE
+            IF( JB.EQ.1 .OR. ( JV.EQ.1 .AND. JB.NE.0 ) ) THEN
+               MB = JMAX - JB + 1
 *
-            IS = IS - 1
-   80    CONTINUE
+*              -------------------------------------------------
+*              Compute triangular eigenvectors
+*     
+               DO 50 IBEND = IMAX, 1, -NBMAX
+                  IB = MAX( IBEND - NBMAX + 1, 1 )
+                  DO 60 I = IB, IBEND
+                     DIAG( I - IB + 1 ) = T( I, I )
+ 60               CONTINUE
+                  TNORM = CLANGE( 'O', IB - 1, MB,
+     $                            T( 1, IB ), LDT, CTEMP )
+                  DO 70 J = JMAX, JB, -1
+                     NB = MIN( JLIST( J ) - IB, IBEND - IB + 1 )
+                     IF( NB.LE.0 )
+     $                  GO TO 70
+*                  
+*                    Safeguarded solve against shifted diagonal block
+*
+                     BOUND = MAX( ULP * CABS1( SHIFTS( J ) ), SMLNUM )
+                     DO 80 I = IB, IB + NB - 1
+                        T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
+                        IF( CABS1( T( I, I ) ).LT.BOUND )
+     $                     T( I, I ) = CMPLX( BOUND )
+ 80                  CONTINUE
+                     NORMIN = 'Y'
+                     IF( J.EQ.JMAX )
+     $                  NORMIN = 'N'
+                     CALL CLATRS( 'U', 'N', 'N', NORMIN, NB,
+     $                            T( IB, IB ), LDT,
+     $                            WORK( IB, J ), SCALE,
+     $                            CNORMS, INFO )
+*
+*                    Rescale if needed
+*
+                     VNORM = SCASUM( NB, WORK( IB, J ), 1 )
+                     BOUNDS( J ) = BOUNDS( J ) * SCALE
+                     BOUND = OVFL - BOUNDS( J )
+                     IF( VNORM.GE.ONE .AND. TNORM.GT.BOUND/VNORM ) THEN
+                        SCALE2 = ( OVFL * HALF / TNORM ) / VNORM
+                        SCALE = SCALE * SCALE2
+                        BOUNDS( J ) = SCALE2 * BOUNDS( J ) + OVFL * HALF
+                     ELSE IF( VNORM.LT.ONE
+     $                        .AND. TNORM*VNORM.GT.BOUND ) THEN
+                        SCALE2 = OVFL * HALF / TNORM
+                        SCALE = SCALE * SCALE2
+                        BOUNDS( J ) = SCALE2 * BOUNDS( J )
+                        BOUNDS( J ) = BOUNDS( J ) + OVFL * HALF * VNORM
+                     ELSE
+                        BOUNDS( J ) = BOUNDS( J ) + TNORM * VNORM
+                     END IF
+                     IF( SCALE.NE.ONE ) THEN
+                        CALL CSSCAL( IB - 1, SCALE, WORK( 1, J ), 1 )
+                        CALL CSSCAL( JLIST( J ) - IBEND - 1, SCALE,
+     $                               WORK( IBEND + 1, J ), 1 )
+                        SCALES( J ) = SCALES( J ) * SCALE
+                     END IF
+ 70               CONTINUE
+                  DO 90 I = IB, IBEND
+                     T( I, I ) = DIAG( I - IB + 1 )
+ 90               CONTINUE
+*
+*                 Back substitution
+*
+                  IF( NB.EQ.1 ) THEN
+                     CALL CGEMV( 'N', IB - 1, NB,
+     $                           CNONE, T( 1, IB ), LDT,
+     $                           WORK( IB, JB ), 1,
+     $                           CONE, WORK( 1, JB ), 1)
+                  ELSE
+                     CALL CGEMM( 'N', 'N', IB - 1, MB, NB,
+     $                           CNONE, T( 1, IB ), LDT,
+     $                           WORK( IB, JB ), N,
+     $                           CONE, WORK( 1, JB ), N )
+                  END IF
+ 50            CONTINUE
+*
+*              Put scale factors on diagonal
+*
+               DO 100 J = JB, JMAX
+                  WORK( JLIST( J ), J ) = SCALES( J )
+ 100           CONTINUE
+*
+*              -------------------------------------------------
+*              Copy results to output
+*                  
+               IF( BACKTRANSFORM ) THEN
+*                  
+*                 Back solve to get full eigenvectors
+*
+                  IF( NB.EQ.1 ) THEN
+                     CALL CGEMV( 'N', N, IMAX,
+     $                           CNONE, VR, LDVR, WORK( 1, 1 ), 1,
+     $                           CZERO, WORK( 1, 2 ), 1)
+                  ELSE
+                     CALL CGEMM( 'N', 'N', N, MB, IMAX,
+     $                           CONE, VR, LDVR, WORK( 1, JB ), N,
+     $                           CZERO, WORK( 1, JMAX + JB ), N )
+                  END IF
+                  DO 110 J = JMAX, JB, -1
+                     SCALE = ONE / CLANGE( 'M', N, 1,
+     $                                     WORK( 1, JMAX + J ), N,
+     $                                     CTEMP )
+                     DO 120 I = N, 1, -1
+                        VR( I, JOUT ) = SCALE * WORK( I, JMAX + J )
+ 120                 CONTINUE
+                     JOUT = JOUT - 1
+ 110              CONTINUE
+               ELSE
+*                  
+*                 Copy triangular eigenvectors to output
+*
+                  DO 130 J = JMAX, JB, -1
+                     SCALE = ONE / CLANGE( 'M', JLIST( J ), 1,
+     $                                     WORK( 1, J ), N, CTEMP )
+                     DO 140 I = N, JLIST( J ), -1
+                        VR( I, JOUT ) = CZERO
+ 140                 CONTINUE
+                     DO 150 I = JLIST( J ), 1, -1
+                        VR( I, JOUT ) = SCALE * WORK( I, J )
+ 150                 CONTINUE
+                     JOUT = JOUT - 1
+ 130              CONTINUE
+                  
+               END IF
+*                  
+*              Workspace is now empty
+*
+               JB = 0
+            END IF
+ 20      CONTINUE
       END IF
-*
+
+
       IF( LEFTV ) THEN
-*
-*        ============================================================
-*        Compute left eigenvectors.
-*
-*        IV is index of column in current block.
-*        Non-blocked version always uses IV=1;
-*        blocked     version starts with IV=1, goes up to NB.
-*        (Note the "0-th" column is used to store the original diagonal.)
-         IV = 1
-         IS = 1
-         DO 130 KI = 1, N
-*
-            IF( SOMEV ) THEN
-               IF( .NOT.SELECT( KI ) )
-     $            GO TO 130
-            END IF
-            SMIN = MAX( ULP*( CABS1( T( KI, KI ) ) ), SMLNUM )
-*
-*           --------------------------------------------------------
-*           Complex left eigenvector
-*
-            WORK( KI + IV*N ) = CONE
-*
-*           Form right-hand side.
-*
-            DO 90 K = KI + 1, N
-               WORK( K + IV*N ) = -CONJG( T( KI, K ) )
-   90       CONTINUE
-*
-*           Solve conjugate-transposed triangular system:
-*           [ T(KI+1:N,KI+1:N) - T(KI,KI) ]**H * X = SCALE*WORK.
-*
-            DO 100 K = KI + 1, N
-               T( K, K ) = T( K, K ) - T( KI, KI )
-               IF( CABS1( T( K, K ) ).LT.SMIN )
-     $            T( K, K ) = SMIN
-  100       CONTINUE
-*
-            IF( KI.LT.N ) THEN
-               CALL CLATRS( 'Upper', 'Conjugate transpose', 'Non-unit',
-     $                      'Y', N-KI, T( KI+1, KI+1 ), LDT,
-     $                      WORK( KI+1 + IV*N ), SCALE, RWORK, INFO )
-               WORK( KI + IV*N ) = SCALE
-            END IF
-*
-*           Copy the vector x or Q*x to VL and normalize.
-*
-            IF( .NOT.OVER ) THEN
-*              ------------------------------
-*              no back-transform: copy x to VL and normalize.
-               CALL CCOPY( N-KI+1, WORK( KI + IV*N ), 1, VL(KI,IS), 1 )
-*
-               II = ICAMAX( N-KI+1, VL( KI, IS ), 1 ) + KI - 1
-               REMAX = ONE / CABS1( VL( II, IS ) )
-               CALL CSSCAL( N-KI+1, REMAX, VL( KI, IS ), 1 )
-*
-               DO 110 K = 1, KI - 1
-                  VL( K, IS ) = CZERO
-  110          CONTINUE
-*
-            ELSE IF( NB.EQ.1 ) THEN
-*              ------------------------------
-*              version 1: back-transform each vector with GEMV, Q*x.
-               IF( KI.LT.N )
-     $            CALL CGEMV( 'N', N, N-KI, CONE, VL( 1, KI+1 ), LDVL,
-     $                        WORK( KI+1 + IV*N ), 1, CMPLX( SCALE ),
-     $                        VL( 1, KI ), 1 )
-*
-               II = ICAMAX( N, VL( 1, KI ), 1 )
-               REMAX = ONE / CABS1( VL( II, KI ) )
-               CALL CSSCAL( N, REMAX, VL( 1, KI ), 1 )
-*
-            ELSE
-*              ------------------------------
-*              version 2: back-transform block of vectors with GEMM
-*              zero out above vector
-*              could go from KI-NV+1 to KI-1
-               DO K = 1, KI - 1
-                  WORK( K + IV*N ) = CZERO
-               END DO
-*
-*              Columns 1:IV of work are valid vectors.
-*              When the number of vectors stored reaches NB,
-*              or if this was last vector, do the GEMM
-               IF( (IV.EQ.NB) .OR. (KI.EQ.N) ) THEN
-                  CALL CGEMM( 'N', 'N', N, IV, N-KI+IV, CONE,
-     $                        VL( 1, KI-IV+1 ), LDVL,
-     $                        WORK( KI-IV+1 + (1)*N ), N,
-     $                        CZERO,
-     $                        WORK( 1 + (NB+1)*N ), N )
-*                 normalize vectors
-                  DO K = 1, IV
-                     II = ICAMAX( N, WORK( 1 + (NB+K)*N ), 1 )
-                     REMAX = ONE / CABS1( WORK( II + (NB+K)*N ) )
-                     CALL CSSCAL( N, REMAX, WORK( 1 + (NB+K)*N ), 1 )
-                  END DO
-                  CALL CLACPY( 'F', N, IV,
-     $                         WORK( 1 + (NB+1)*N ), N,
-     $                         VL( 1, KI-IV+1 ), LDVL )
-                  IV = 1
-               ELSE
-                  IV = IV + 1
-               END IF
-            END IF
-*
-*           Restore the original diagonal elements of T.
-*
-            DO 120 K = KI + 1, N
-               T( K, K ) = WORK( K )
-  120       CONTINUE
-*
-            IS = IS + 1
-  130    CONTINUE
-      END IF
-*
+*     TODO
+      ENDIF
+
       RETURN
 *
 *     End of CTREVC3
