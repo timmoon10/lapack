@@ -392,7 +392,7 @@
             IF( WANTVL ) THEN
                CALL CTREVC3( 'L', 'B', SELECT, N, A, LDA,
      $                       VL, LDVL, VR, LDVR,
-     $                       N, NOUT, WORK, -1, RWORK, -1, IERR )
+     $                       N, NOUT, WORK, -1, IERR )
                LWORK_TREVC = INT( WORK(1) )
                MAXWRK = MAX( MAXWRK, LWORK_TREVC )
                CALL CHSEQR( 'S', 'V', N, 1, N, A, LDA, W, VL, LDVL,
@@ -400,7 +400,7 @@
             ELSE IF( WANTVR ) THEN
                CALL CTREVC3( 'R', 'B', SELECT, N, A, LDA,
      $                       VL, LDVL, VR, LDVR,
-     $                       N, NOUT, WORK, -1, RWORK, -1, IERR )
+     $                       N, NOUT, WORK, -1, IERR )
                LWORK_TREVC = INT( WORK(1) )
                MAXWRK = MAX( MAXWRK, LWORK_TREVC )
                CALL CHSEQR( 'S', 'V', N, 1, N, A, LDA, W, VR, LDVR,
@@ -580,12 +580,10 @@
       IF( WANTVL .OR. WANTVR ) THEN
 *
 *        Compute left and/or right eigenvectors
-*        (CWorkspace: need 2*N, prefer N + 2*N*NB)
-*        (RWorkspace: need N)
+*        (CWorkspace: need 2*N, prefer 2*N*NB)
 *
          CALL CTREVC3( SIDE, 'B', SELECT, N, A, LDA, VL, LDVL, VR, LDVR,
-     $                 N, NOUT, WORK( IWRK ), LWORK-IWRK+1,
-     $                 RWORK, N, IERR )
+     $                 N, NOUT, WORK( IWRK ), LWORK-IWRK+1, IERR )
       END IF
 *
 *     Compute condition numbers if desired

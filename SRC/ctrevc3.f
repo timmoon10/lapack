@@ -18,9 +18,8 @@
 *  Definition:
 *  ===========
 *
-*     SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N,
-*                          T, LDT, VL, LDVL, VR, LDVR,
-*                          MM, M, WORK, LWORK, INFO)
+*     SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N, T, LDT,
+*    $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO)
 *
 *       .. Scalar Arguments ..
 *       CHARACTER          HOWMNY, SIDE
@@ -225,10 +224,9 @@
 *> \endverbatim
 *>
 *  =====================================================================
-      SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N,
-     $                    T, LDT, VL, LDVL, VR, LDVR,
-     $                    MM, M, WORK, LWORK, INFO)
-     IMPLICIT NONE
+      SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N, T, LDT,
+     $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO)
+      IMPLICIT NONE
 *
 *  -- LAPACK computational routine (version 3.8.0) --
 *  -- LAPACK is a software package provided by Univ. of Tennessee,    --
@@ -236,52 +234,56 @@
 *     November 2017
 *
 *     .. Scalar Arguments ..
-      CHARACTER HOWMNY, SIDE
-      INTEGER   INFO, LDT, LDVL, LDVR, LWORK, M, MM, N
+      CHARACTER          HOWMNY, SIDE
+      INTEGER            INFO, LDT, LDVL, LDVR, LWORK, M, MM, N
 *     ..
 *     .. Array Arguments ..
-      LOGICAL   SELECT( * )
-      COMPLEX   T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ), WORK( N, * )
+      LOGICAL            SELECT( * )
+      COMPLEX            T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
+     $                   WORK( N, * )
 *     ..
 *
 *  =====================================================================
 *
 *     .. Parameters ..
-      REAL      ZERO, ONE, HALF
-      PARAMETER ( ZERO = 0.0E+0, ONE = 1.0E+0, HALF = 5.0E-1 )
-      COMPLEX   CZERO, CONE, CNONE
-      PARAMETER ( CZERO = ( 0.0E+0, 0.0E+0 ),
-     $            CONE  = ( 1.0E+0, 0.0E+0 ),
-     $            CNONE = ( -1.0E+0, 0.0E+0 ) )
-      INTEGER   NBMAX, MBMIN, MBMAX
-      PARAMETER ( NBMAX = 32, MBMIN = 8, MBMAX = 128 )
+      REAL               ZERO, ONE, HALF
+      PARAMETER          ( ZERO = 0.0E+0, ONE = 1.0E+0, HALF = 5.0E-1 )
+      COMPLEX            CZERO, CONE, CNONE
+      PARAMETER          ( CZERO = ( 0.0E+0, 0.0E+0 ),
+     $                     CONE  = ( 1.0E+0, 0.0E+0 ),
+     $                     CNONE = ( -1.0E+0, 0.0E+0 ) )
+      INTEGER            NBMAX, MBMIN, MBMAX
+      PARAMETER          ( NBMAX = 32, MBMIN = 8, MBMAX = 128 )
 *     ..
 *     .. Local Scalars ..
-      LOGICAL   LEFTV, RIGHTV, BACKTRANSFORM, SOMEV
-      REAL      UNFL, OVFL, ULP, SMLNUM, SCALE, BOUND, TNORM, VNORM
-      COMPLEX   CTEMP
-      CHARACTER NORMIN
-      INTEGER   I, IB, IBEND, IMAX, J, JV, JB, JOUT, JMAX, NB, MB
+      LOGICAL            LEFTV, RIGHTV, BACKTRANSFORM, SOMEV, SELECTV
+      REAL               UNFL, OVFL, ULP, SMLNUM, SCALE, TNORM, VNORM,
+     $                   TEMP
+      COMPLEX            CTEMP
+      CHARACTER          NORMIN
+      INTEGER            I, IB, IBEND, IMAX, J, JV, JB, JOUT, JMAX,
+     $                   NB, MB
 *     ..
 *     .. Local Arrays ..
-      INTEGER   JLIST( NBMAX )
-      REAL      SCALES( NBMAX ), BOUNDS( NBMAX )
-      COMPLEX   SHIFTS( NBMAX ), DIAG( NBMAX )
+      INTEGER            JLIST( NBMAX )
+      REAL               SCALES( NBMAX ), BOUNDS( NBMAX ),
+     $                   CNORMS( NBMAX )
+      COMPLEX            SHIFTS( NBMAX ), DIAG( NBMAX )
 *     ..
 *     .. External Functions ..
-      LOGICAL   LSAME
-      INTEGER   ILAENV
-      REAL      SLAMCH, SCASUM, CLANGE
-      EXTERNAL  LSAME, ILAENV, ICAMAX, SLAMCH, SCASUM, CLANGE
+      LOGICAL            LSAME
+      INTEGER            ILAENV
+      REAL               SLAMCH, SCASUM, CLANGE
+      EXTERNAL           LSAME, ILAENV, SLAMCH, SCASUM, CLANGE
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL  XERBLA, CSSCAL, CGEMM, CLATRS, SLABAD
+      EXTERNAL           XERBLA, SLABAD, CSSCAL, CLATRS, CGEMV, CGEMM
 *     ..
 *     .. Intrinsic Functions ..
-      INTRINSIC ABS, REAL, AIMAG, CMPLX, MIN, MAX
+      INTRINSIC          ABS, REAL, AIMAG, CMPLX, CONJG, MIN, MAX
 *     ..
 *     .. Statement Functions ..
-      REAL      CABS1
+      REAL               CABS1
 *     ..
 *     .. Statement Function definitions ..
       CABS1( CTEMP ) = ABS( REAL( CTEMP ) ) + ABS( AIMAG( CTEMP ) )
@@ -423,15 +425,17 @@
 *                  
 *                    Safeguarded solve against shifted diagonal block
 *
-                     BOUND = MAX( ULP * CABS1( SHIFTS( J ) ), SMLNUM )
+                     TEMP = MAX( ULP * CABS1( SHIFTS( J ) ), SMLNUM )
                      DO 80 I = IB, IB + NB - 1
                         T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
-                        IF( CABS1( T( I, I ) ).LT.BOUND )
-     $                     T( I, I ) = CMPLX( BOUND )
+                        IF( CABS1( T( I, I ) ).LT.TEMP )
+     $                     T( I, I ) = CMPLX( TEMP )
  80                  CONTINUE
-                     NORMIN = 'Y'
-                     IF( J.EQ.JMAX )
-     $                  NORMIN = 'N'
+                     IF( J.EQ.JMAX ) THEN
+                        NORMIN = 'N'
+                     ELSE
+                        NORMIN = 'Y'
+                     END IF
                      CALL CLATRS( 'U', 'N', 'N', NORMIN, NB,
      $                            T( IB, IB ), LDT,
      $                            WORK( IB, J ), SCALE,
@@ -441,17 +445,17 @@
 *
                      VNORM = SCASUM( NB, WORK( IB, J ), 1 )
                      BOUNDS( J ) = BOUNDS( J ) * SCALE
-                     BOUND = OVFL - BOUNDS( J )
-                     IF( VNORM.GE.ONE .AND. TNORM.GT.BOUND/VNORM ) THEN
-                        SCALE2 = ( OVFL * HALF / TNORM ) / VNORM
-                        SCALE = SCALE * SCALE2
-                        BOUNDS( J ) = SCALE2 * BOUNDS( J ) + OVFL * HALF
+                     TEMP = OVFL - BOUNDS( J )
+                     IF( VNORM.GE.ONE .AND. TNORM.GT.TEMP/VNORM ) THEN
+                        TEMP = ( OVFL * HALF / TNORM ) / VNORM
+                        SCALE = TEMP * SCALE
+                        BOUNDS( J ) = TEMP * BOUNDS( J ) + OVFL * HALF
                      ELSE IF( VNORM.LT.ONE
-     $                        .AND. TNORM*VNORM.GT.BOUND ) THEN
-                        SCALE2 = OVFL * HALF / TNORM
-                        SCALE = SCALE * SCALE2
-                        BOUNDS( J ) = SCALE2 * BOUNDS( J )
-                        BOUNDS( J ) = BOUNDS( J ) + OVFL * HALF * VNORM
+     $                        .AND. TNORM*VNORM.GT.TEMP ) THEN
+                        TEMP = OVFL * HALF / TNORM
+                        SCALE = TEMP * SCALE
+                        BOUNDS( J ) = TEMP * BOUNDS( J )
+     $                                + OVFL * HALF * VNORM
                      ELSE
                         BOUNDS( J ) = BOUNDS( J ) + TNORM * VNORM
                      END IF
