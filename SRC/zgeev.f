@@ -205,7 +205,7 @@
       LOGICAL            LQUERY, SCALEA, WANTVL, WANTVR
       CHARACTER          SIDE
       INTEGER            HSWORK, I, IBAL, IERR, IHI, ILO, IRWORK, ITAU,
-     $                   IWRK, K, LWORK_TREVC, MAXWRK, MINWRK, NOUT
+     $                   IWRK, K, LWORK_TREVC3, MAXWRK, MINWRK, NOUT
       DOUBLE PRECISION   ANRM, BIGNUM, CSCALE, EPS, SCL, SMLNUM
       COMPLEX*16         TMP
 *     ..
@@ -272,8 +272,8 @@
                CALL ZTREVC3( 'L', 'B', SELECT, N, A, LDA,
      $                       VL, LDVL, VR, LDVR,
      $                       N, NOUT, WORK, -1, IERR )
-               LWORK_TREVC = INT( WORK(1) )
-               MAXWRK = MAX( MAXWRK, N + LWORK_TREVC )
+               LWORK_TREVC3 = INT( WORK(1) )
+               MAXWRK = MAX( MAXWRK, N + LWORK_TREVC3 )
                CALL ZHSEQR( 'S', 'V', N, 1, N, A, LDA, W, VL, LDVL,
      $                      WORK, -1, INFO )
             ELSE IF( WANTVR ) THEN
@@ -282,8 +282,8 @@
                CALL ZTREVC3( 'R', 'B', SELECT, N, A, LDA,
      $                       VL, LDVL, VR, LDVR,
      $                       N, NOUT, WORK, -1, IERR )
-               LWORK_TREVC = INT( WORK(1) )
-               MAXWRK = MAX( MAXWRK, N + LWORK_TREVC )
+               LWORK_TREVC3 = INT( WORK(1) )
+               MAXWRK = MAX( MAXWRK, N + LWORK_TREVC3 )
                CALL ZHSEQR( 'S', 'V', N, 1, N, A, LDA, W, VR, LDVR,
      $                      WORK, -1, INFO )
             ELSE
@@ -427,7 +427,6 @@
 *        Compute left and/or right eigenvectors
 *        (CWorkspace: need 2*N, prefer 2*N*NB)
 *
-         IRWORK = IBAL + N
          CALL ZTREVC3( SIDE, 'B', SELECT, N, A, LDA, VL, LDVL, VR, LDVR,
      $                 N, NOUT, WORK( IWRK ), LWORK-IWRK+1, IERR )
       END IF

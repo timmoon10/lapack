@@ -272,9 +272,9 @@
 *     ..
 *     .. External Functions ..
       LOGICAL            LSAME
-      INTEGER            ILAENV
+      INTEGER            ILAENV, IZAMAX
       DOUBLE PRECISION   DLAMCH, DZASUM, ZLANGE
-      EXTERNAL           LSAME, ILAENV, ZLAMCH, DZASUM, ZLANGE
+      EXTERNAL           LSAME, ILAENV, IZAMAX, ZLAMCH, DZASUM, ZLANGE
 *     ..
 *     .. External Subroutines ..
       EXTERNAL           XERBLA, DLABAD, ZDSCAL, ZLATRS, ZGEMV, ZGEMM
@@ -367,7 +367,7 @@
       IF( RIGHTV ) THEN
          JOUT = M
          JB = 0
-         DO 20 JV = N, 1, -1
+         DO 100 JV = N, 1, -1
 *
 *           --------------------------------------------------------
 *           Add current eigenvector to workspace (if needed).
@@ -384,12 +384,12 @@
                ELSE
                   JB = JB - 1
                END IF
-               DO 30 I = 1, JV - 1
+               DO 110 I = 1, JV - 1
                   WORK( I, JB ) = -T( I, JV )
- 30            CONTINUE
-               DO 40 I = JV, IMAX
+ 110           CONTINUE
+               DO 120 I = JV, IMAX
                   WORK( I, JB ) = CZERO
- 40            CONTINUE
+ 120           CONTINUE
                JLIST( JB ) = JV
                SHIFTS( JB ) = T( JV, JV )
                BOUNDS( JB ) = DZASUM( JV - 1, WORK( 1, JB ), 1 )
@@ -406,33 +406,33 @@
 *           Process workspace if full or if all eigenvectors are
 *           found.
 *
-            IF( JB.EQ.1 .OR. ( JOUT.EQ.1 .AND. JB.NE.0 ) ) THEN
+            IF( JB.EQ.1 .OR. ( JV.EQ.1 .AND. JB.NE.0 ) ) THEN
                MB = JMAX - JB + 1
 *
 *              -----------------------------------------------------
 *              Compute triangular eigenvectors with safe,
 *              multi-shift, blocked back substitution.
 *     
-               DO 50 IBEND = IMAX, 1, -NBMAX
+               DO 130 IBEND = IMAX, 1, -NBMAX
                   IB = MAX( IBEND - NBMAX + 1, 1 )
-                  DO 60 I = IB, IBEND
+                  DO 140 I = IB, IBEND
                      DIAG( I - IB + 1 ) = T( I, I )
- 60               CONTINUE
+ 140              CONTINUE
                   TNORM = ZLANGE( 'O', IB - 1, MB,
      $                            T( 1, IB ), LDT, CTEMP )
-                  DO 70 J = JMAX, JB, -1
+                  DO 150 J = JMAX, JB, -1
                      NB = MIN( JLIST( J ) - IB, IBEND - IB + 1 )
                      IF( NB.LE.0 )
-     $                  GO TO 70
+     $                  GO TO 150
 *                  
 *                    Safeguarded solve with shifted diagonal block.
 *
                      TEMP = MAX( ULP * CABS1( SHIFTS( J ) ), SMLNUM )
-                     DO 80 I = IB, IB + NB - 1
+                     DO 160 I = IB, IB + NB - 1
                         T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
                         IF( CABS1( T( I, I ) ).LT.TEMP )
      $                     T( I, I ) = DCMPLX( TEMP )
- 80                  CONTINUE
+ 160                 CONTINUE
                      IF( J.EQ.JMAX ) THEN
                         NORMIN = 'N'
                      ELSE
@@ -467,32 +467,34 @@
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
                      END IF
- 70               CONTINUE
-                  DO 90 I = IB, IBEND
+ 150              CONTINUE
+                  DO 170 I = IB, IBEND
                      T( I, I ) = DIAG( I - IB + 1 )
- 90               CONTINUE
+ 170              CONTINUE
 *
 *                 Back substitution with block of solution.
 *
-                  IF( NB.EQ.1 ) THEN
-                     CALL ZGEMV( 'N', IB - 1, NB,
-     $                           CNONE, T( 1, IB ), LDT,
-     $                           WORK( IB, JB ), 1,
-     $                           CONE, WORK( 1, JB ), 1)
-                  ELSE
-                     CALL ZGEMM( 'N', 'N', IB - 1, MB, NB,
-     $                           CNONE, T( 1, IB ), LDT,
-     $                           WORK( IB, JB ), N,
-     $                           CONE, WORK( 1, JB ), N )
+                  IF( IB.GT.1 ) THEN
+                     IF( NB.EQ.1 ) THEN
+                        CALL ZGEMV( 'N', IB - 1, NB,
+     $                              CNONE, T( 1, IB ), LDT,
+     $                              WORK( IB, JB ), 1,
+     $                              CONE, WORK( 1, JB ), 1 )
+                     ELSE
+                        CALL ZGEMM( 'N', 'N', IB - 1, MB, NB,
+     $                              CNONE, T( 1, IB ), LDT,
+     $                              WORK( IB, JB ), N,
+     $                              CONE, WORK( 1, JB ), N )
+                     END IF
                   END IF
- 50            CONTINUE
+ 130           CONTINUE
 *
 *              Put scale factors on diagonal to get triangular
 *              eigenvectors.
 *
-               DO 100 J = JB, JMAX
+               DO 180 J = JB, JMAX
                   WORK( JLIST( J ), J ) = SCALES( J )
- 100           CONTINUE
+ 180           CONTINUE
 *
 *              -----------------------------------------------------
 *              Copy results to output.
@@ -502,39 +504,38 @@
 *                 Back transform with Schur vectors to get full
 *                 eigenvectors.
 *
-                  IF( NB.EQ.1 ) THEN
+                  IF( JMAX.EQ.1 ) THEN
                      CALL ZGEMV( 'N', N, IMAX,
-     $                           CNONE, VR, LDVR, WORK( 1, 1 ), 1,
-     $                           CZERO, WORK( 1, 2 ), 1)
+     $                           CONE, VR, LDVR, WORK( 1, JB ), 1,
+     $                           CZERO, WORK( 1, JMAX + JB ), 1)
                   ELSE
                      CALL ZGEMM( 'N', 'N', N, MB, IMAX,
      $                           CONE, VR, LDVR, WORK( 1, JB ), N,
      $                           CZERO, WORK( 1, JMAX + JB ), N )
                   END IF
-                  DO 110 J = JMAX, JB, -1
-                     SCALE = ONE / ZLANGE( 'M', N, 1,
-     $                                     WORK( 1, JMAX + J ), N,
-     $                                     CTEMP )
-                     DO 120 I = N, 1, -1
+                  DO 190 J = JMAX, JB, -1
+                     I = IZAMAX( N, WORK( 1, JMAX + J ), 1 )
+                     SCALE = ONE / CABS1( WORK( I, JMAX + J ) )
+                     DO 200 I = N, 1, -1
                         VR( I, JOUT ) = SCALE * WORK( I, JMAX + J )
- 120                 CONTINUE
+ 200                 CONTINUE
                      JOUT = JOUT - 1
- 110              CONTINUE
+ 190              CONTINUE
                ELSE
 *                  
 *                 Copy triangular eigenvectors to output.
 *
-                  DO 130 J = JMAX, JB, -1
-                     SCALE = ONE / ZLANGE( 'M', JLIST( J ), 1,
-     $                                     WORK( 1, J ), N, CTEMP )
-                     DO 140 I = N, JLIST( J ), -1
+                  DO 210 J = JMAX, JB, -1
+                     I = IZAMAX( JLIST( J ), WORK( 1, J ), 1 )
+                     SCALE = ONE / CABS1( WORK( I, J ) )
+                     DO 220 I = N, JLIST( J ) + 1, -1
                         VR( I, JOUT ) = CZERO
- 140                 CONTINUE
-                     DO 150 I = JLIST( J ), 1, -1
+ 220                 CONTINUE
+                     DO 230 I = JLIST( J ), 1, -1
                         VR( I, JOUT ) = SCALE * WORK( I, J )
- 150                 CONTINUE
+ 230                 CONTINUE
                      JOUT = JOUT - 1
- 130              CONTINUE
+ 210              CONTINUE
                   
                END IF
 *                  
@@ -542,7 +543,7 @@
 *
                JB = 0
             END IF
- 20      CONTINUE
+ 100     CONTINUE
       END IF
 
 

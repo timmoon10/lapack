@@ -50,7 +50,7 @@
 *>            w(1), ..., w(n); we define a diagonal matrix W whose
 *>            (diagonal) entries are the eigenvalues.
 *>
-*>            ZTREVC computes the left eigenvector matrix L and the
+*>            ZTREVC3 computes the left eigenvector matrix L and the
 *>            right eigenvector matrix R for the matrix T.  The
 *>            columns of L are the complex conjugates of the left
 *>            eigenvectors of T.  The columns of R are the right
@@ -466,8 +466,8 @@
 *     .. External Subroutines ..
       EXTERNAL           DLABAD, DLAFTS, DLASUM, XERBLA, ZCOPY, ZGEHRD,
      $                   ZGEMM, ZGET10, ZGET22, ZHSEIN, ZHSEQR, ZHST01,
-     $                   ZLACPY, ZLASET, ZLATME, ZLATMR, ZLATMS, ZTREVC,
-     $                   ZUNGHR, ZUNMHR
+     $                   ZLACPY, ZLASET, ZLATME, ZLATMR, ZLATMS,
+     $                   ZTREVC3, ZUNGHR, ZUNMHR
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, DBLE, MAX, MIN, SQRT
@@ -852,10 +852,10 @@
             DO 150 J = 1, N, 2
                SELECT( J ) = .TRUE.
   150       CONTINUE
-            CALL ZTREVC( 'Right', 'All', SELECT, N, T1, LDA, CDUMMA,
-     $                   LDU, EVECTR, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL ZTREVC3( 'Right', 'All', SELECT, N, T1, LDA, CDUMMA,
+     $                    LDU, EVECTR, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'ZTREVC(R,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'ZTREVC3(R,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -867,17 +867,17 @@
      $                   WORK, RWORK, DUMMA( 1 ) )
             RESULT( 9 ) = DUMMA( 1 )
             IF( DUMMA( 2 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Right', 'ZTREVC',
+               WRITE( NOUNIT, FMT = 9998 )'Right', 'ZTREVC3',
      $            DUMMA( 2 ), N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected right eigenvectors and confirm that
 *           they agree with previous right eigenvectors
 *
-            CALL ZTREVC( 'Right', 'Some', SELECT, N, T1, LDA, CDUMMA,
-     $                   LDU, EVECTL, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL ZTREVC3( 'Right', 'Some', SELECT, N, T1, LDA, CDUMMA,
+     $                    LDU, EVECTL, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'ZTREVC(R,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'ZTREVC3(R,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -898,17 +898,18 @@
   170       CONTINUE
   180       CONTINUE
             IF( .NOT.MATCH )
-     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'ZTREVC', N, JTYPE,
+     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'ZTREVC3', N, JTYPE,
      $         IOLDSD
 *
 *           Compute the Left eigenvector Matrix:
 *
             NTEST = 10
             RESULT( 10 ) = ULPINV
-            CALL ZTREVC( 'Left', 'All', SELECT, N, T1, LDA, EVECTL, LDU,
-     $                   CDUMMA, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL ZTREVC3( 'Left', 'All', SELECT, N, T1, LDA,
+     $                    EVECTL, LDU, CDUMMA, LDU,
+     $                    N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'ZTREVC(L,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'ZTREVC3(L,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -920,17 +921,17 @@
      $                   WORK, RWORK, DUMMA( 3 ) )
             RESULT( 10 ) = DUMMA( 3 )
             IF( DUMMA( 4 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Left', 'ZTREVC', DUMMA( 4 ),
+               WRITE( NOUNIT, FMT = 9998 )'Left', 'ZTREVC3', DUMMA( 4 ),
      $            N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected left eigenvectors and confirm that
 *           they agree with previous left eigenvectors
 *
-            CALL ZTREVC( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
-     $                   LDU, CDUMMA, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL ZTREVC3( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
+     $                    LDU, CDUMMA, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'ZTREVC(L,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'ZTREVC3(L,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -951,7 +952,7 @@
   200       CONTINUE
   210       CONTINUE
             IF( .NOT.MATCH )
-     $         WRITE( NOUNIT, FMT = 9997 )'Left', 'ZTREVC', N, JTYPE,
+     $         WRITE( NOUNIT, FMT = 9997 )'Left', 'ZTREVC3', N, JTYPE,
      $         IOLDSD
 *
 *           Call ZHSEIN for Right eigenvectors of H, do test 11
