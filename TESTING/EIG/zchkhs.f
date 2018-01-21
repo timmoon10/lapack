@@ -944,7 +944,7 @@
                IF( SELECT( J ) ) THEN
                   DO 190 JJ = 1, N
                      TEMP1 = ABS( EVECTL( JJ, J ) - EVECTR( JJ, K ) )
-                     IF( TEMP * ULPINV.GT.THRESH ) THEN
+                     IF( TEMP1 * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 210
                      END IF

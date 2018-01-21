@@ -18,8 +18,8 @@
 *  Definition:
 *  ===========
 *
-*     SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N, T, LDT,
-*    $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO)
+*       SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N, T, LDT,
+*      $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO)
 *
 *       .. Scalar Arguments ..
 *       CHARACTER          HOWMNY, SIDE
@@ -225,7 +225,7 @@
 *>
 *  =====================================================================
       SUBROUTINE CTREVC3( SIDE, HOWMNY, SELECT, N, T, LDT,
-     $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO)
+     $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO )
       IMPLICIT NONE
 *
 *  -- LAPACK computational routine (version 3.8.0) --
@@ -252,35 +252,35 @@
       PARAMETER          ( CZERO = ( 0.0E+0, 0.0E+0 ),
      $                     CONE  = ( 1.0E+0, 0.0E+0 ),
      $                     CNONE = ( -1.0E+0, 0.0E+0 ) )
-      INTEGER            NBMAX, MBMIN, MBMAX
-      PARAMETER          ( NBMAX = 32, MBMIN = 8, MBMAX = 128 )
+      INTEGER            NBMAX, MBMAX
+      PARAMETER          ( NBMAX = 32, MBMAX = 128 )
 *     ..
 *     .. Local Scalars ..
       LOGICAL            LEFTV, RIGHTV, BACKTRANSFORM, SOMEV, SELECTV
-      REAL               UNFL, OVFL, ULP, SMLNUM, SCALE, TNORM, VNORM,
-     $                   TEMP
+      REAL               UNFL, OVFL, ULP, SMLNUM, SCALE,
+     $                   TOFFNORM, TDIAGNORM, VNORM, TEMP
       COMPLEX            CTEMP
-      CHARACTER          NORMIN
-      INTEGER            I, IB, IBEND, IMAX, J, JV, JB, JOUT, JMAX,
+      INTEGER            I, IB, IBEND, IMIN, IMAX,
+     $                   J, JV, JB, JBEND, JOUT, JMAX,
      $                   NB, MB
 *     ..
 *     .. Local Arrays ..
-      INTEGER            JLIST( NBMAX )
-      REAL               SCALES( NBMAX ), BOUNDS( NBMAX ),
+      INTEGER            JLIST( MBMAX )
+      REAL               SCALES( MBMAX ), BOUNDS( MBMAX ),
      $                   CNORMS( NBMAX )
-      COMPLEX            SHIFTS( NBMAX ), DIAG( NBMAX )
+      COMPLEX            SHIFTS( MBMAX ), DIAG( NBMAX )
 *     ..
 *     .. External Functions ..
       LOGICAL            LSAME
-      INTEGER            ILAENV
+      INTEGER            ILAENV, ICAMAX
       REAL               SLAMCH, SCASUM, CLANGE
-      EXTERNAL           LSAME, ILAENV, SLAMCH, SCASUM, CLANGE
+      EXTERNAL           LSAME, ILAENV, CLAMCH, ICAMAX, SCASUM, CLANGE
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           XERBLA, SLABAD, CSSCAL, CLATRS, CGEMV, CGEMM
+      EXTERNAL           XERBLA, SLABAD, CSSCAL, CGEMM, CLATRS
 *     ..
 *     .. Intrinsic Functions ..
-      INTRINSIC          ABS, REAL, AIMAG, CMPLX, CONJG, MIN, MAX
+      INTRINSIC          ABS, REAL, CMPLX, AIMAG, CONJG, MIN, MAX
 *     ..
 *     .. Statement Functions ..
       REAL               CABS1
@@ -344,13 +344,9 @@
       IF( N.EQ.0 )
      $   RETURN
 *
-*     Use blocked version of back-transformation if sufficient workspace.
+*     Determine block size
 *
-      IF( LWORK .GE. 2*N*MBMIN ) THEN
-         JMAX = MIN( LWORK / (2*N), NBMAX )
-      ELSE
-         JMAX = 1
-      END IF
+      JMAX = MIN( LWORK / (2*N), MBMAX )
 *
 *     Set the constants to control overflow.
 *
@@ -361,16 +357,19 @@
       SMLNUM = UNFL*( N / ULP )
 
 *
-*     ----------------------------------------------------------
-*     Compute right eigenvectors
+*     --------------------------------------------------------------
+*     Compute right eigenvectors.
 *
       IF( RIGHTV ) THEN
-         JOUT = M
-         JB = 0
-         DO 20 JV = N, 1, -1
+         IMIN = 1
+         IMAX = 0
+         JB = JMAX + 1
+         JBEND = JMAX
+         JOUT = M + 1
+         DO 100 JV = N, 1, -1
 *
-*           ----------------------------------------------------
-*           Set up workspace for current eigenvector if needed
+*           --------------------------------------------------------
+*           Add current eigenvector to workspace if needed.
 *
             IF( SOMEV ) THEN
                SELECTV = SELECT( JV )
@@ -378,173 +377,327 @@
                SELECTV = .TRUE.
             END IF
             IF( SELECTV ) THEN
-               IF( JB.EQ.0 ) THEN
-                  JB = JMAX
-                  IMAX = JV - 1
-               ELSE
-                  JB = JB - 1
-               END IF
-               DO 30 I = 1, JV - 1
-                  WORK( I, JB ) = -T( I, JV )
- 30            CONTINUE
-               DO 40 I = JV, IMAX
-                  WORK( I, JB ) = CZERO
- 40            CONTINUE
+               IMAX = MAX( IMAX, JV )
+               JB = JB - 1
+               WORK( IMIN : JV - 1, JB ) = -T( IMIN : JV - 1, JV )
+               WORK( JV : IMAX, JB ) = CZERO
                JLIST( JB ) = JV
                SHIFTS( JB ) = T( JV, JV )
-               BOUNDS( JB ) = SCASUM( JV - 1, WORK( 1, JB ), 1 )
-               IF( BOUNDS( JB ).GT.OVFL ) THEN
+               BOUNDS( JB ) = SCASUM( JV - IMIN, WORK( IMIN, JB ), 1 )
+               IF( BOUNDS( JB ).GE.OVFL ) THEN
                   SCALES( JB ) = HALF * OVFL / BOUNDS( JB )
                   BOUNDS( JB ) = HALF * OVFL
-                  CALL CSSCAL( JV - 1, SCALES( JB ), WORK( 1, JB ), 1 )
+                  CALL CSSCAL( JV - IMIN, SCALES( JB ),
+     $                         WORK( IMIN, JB ), 1 )
                ELSE
                   SCALES( JB ) = ONE
                END IF
             END IF
 *
-*           ----------------------------------------------------
-*           Process workspace if needed
+*           --------------------------------------------------------
+*           Process workspace if full or if all eigenvectors are
+*           found.
 *
-            IF( JB.EQ.1 .OR. ( JV.EQ.1 .AND. JB.NE.0 ) ) THEN
-               MB = JMAX - JB + 1
+            IF( JB.EQ.1 .OR. ( JV.EQ.1 .AND. JB.LE.JBEND ) ) THEN
+               MB = JBEND - JB + 1
 *
-*              -------------------------------------------------
-*              Compute triangular eigenvectors
+*              -----------------------------------------------------
+*              Compute triangular eigenvectors with safe,
+*              multi-shift, blocked back substitution.
 *     
-               DO 50 IBEND = IMAX, 1, -NBMAX
-                  IB = MAX( IBEND - NBMAX + 1, 1 )
-                  DO 60 I = IB, IBEND
+               DO 110 IBEND = IMAX, IMIN, -NBMAX
+                  IB = MAX( IBEND - NBMAX + 1, IMIN )
+                  NB = IBEND - IB + 1
+                  DO 120 I = IB, IBEND
                      DIAG( I - IB + 1 ) = T( I, I )
- 60               CONTINUE
-                  TNORM = CLANGE( 'O', IB - 1, MB,
-     $                            T( 1, IB ), LDT, CTEMP )
-                  DO 70 J = JMAX, JB, -1
-                     NB = MIN( JLIST( J ) - IB, IBEND - IB + 1 )
+                     CNORMS( I - IB + 1 ) = SCASUM( I - IB,
+     $                                              T( IB, I ), 1 )
+ 120              CONTINUE
+                  TDIAGNORM = CLANGE( 'O', NB, NB,
+     $                                T( IB, IB ), LDT, CTEMP )
+                  TOFFNORM = CLANGE( 'O', IB - IMIN, NB,
+     $                               T( IMIN, IB ), LDT, CTEMP )
+                  DO 130 J = JB, JBEND
+                     NB = MIN( JLIST( J ) - 1, IBEND) - IB + 1
                      IF( NB.LE.0 )
-     $                  GO TO 70
+     $                  GO TO 130
 *                  
-*                    Safeguarded solve against shifted diagonal block
+*                    Safeguarded solve with shifted diagonal block.
 *
-                     TEMP = MAX( ULP * CABS1( SHIFTS( J ) ), SMLNUM )
-                     DO 80 I = IB, IB + NB - 1
+                     TEMP = MAX( ULP * TDIAGNORM, SMLNUM )
+                     DO 140 I = IB, IB + NB - 1
                         T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
                         IF( CABS1( T( I, I ) ).LT.TEMP )
      $                     T( I, I ) = CMPLX( TEMP )
- 80                  CONTINUE
-                     IF( J.EQ.JMAX ) THEN
-                        NORMIN = 'N'
-                     ELSE
-                        NORMIN = 'Y'
-                     END IF
-                     CALL CLATRS( 'U', 'N', 'N', NORMIN, NB,
+ 140                 CONTINUE
+                     CALL CLATRS( 'U', 'N', 'N', 'Y', NB,
      $                            T( IB, IB ), LDT,
      $                            WORK( IB, J ), SCALE,
-     $                            CNORMS, INFO )
+     $                            CNORMS( 1 ), INFO )
 *
-*                    Rescale if needed
+*                    Rescale solution (if needed).
 *
                      VNORM = SCASUM( NB, WORK( IB, J ), 1 )
                      BOUNDS( J ) = BOUNDS( J ) * SCALE
                      TEMP = OVFL - BOUNDS( J )
-                     IF( VNORM.GE.ONE .AND. TNORM.GT.TEMP/VNORM ) THEN
-                        TEMP = ( OVFL * HALF / TNORM ) / VNORM
+                     IF( VNORM.GE.ONE
+     $                   .AND. TOFFNORM.GT.TEMP/VNORM ) THEN
+                        TEMP = ( OVFL * HALF / TOFFNORM ) / VNORM
                         SCALE = TEMP * SCALE
                         BOUNDS( J ) = TEMP * BOUNDS( J ) + OVFL * HALF
                      ELSE IF( VNORM.LT.ONE
-     $                        .AND. TNORM*VNORM.GT.TEMP ) THEN
-                        TEMP = OVFL * HALF / TNORM
+     $                        .AND. TOFFNORM*VNORM.GT.TEMP ) THEN
+                        TEMP = OVFL * HALF / TOFFNORM
                         SCALE = TEMP * SCALE
                         BOUNDS( J ) = TEMP * BOUNDS( J )
      $                                + OVFL * HALF * VNORM
                      ELSE
-                        BOUNDS( J ) = BOUNDS( J ) + TNORM * VNORM
+                        BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                      END IF
                      IF( SCALE.NE.ONE ) THEN
-                        CALL CSSCAL( IB - 1, SCALE, WORK( 1, J ), 1 )
-                        CALL CSSCAL( JLIST( J ) - IBEND - 1, SCALE,
+                        I = MIN( JLIST( J ) - 1, IBEND )
+                        CALL CSSCAL( IB - IMIN, SCALE,
+     $                               WORK( IMIN, J ), 1 )
+                        CALL CSSCAL( I - IBEND, SCALE,
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
                      END IF
- 70               CONTINUE
-                  DO 90 I = IB, IBEND
+ 130              CONTINUE
+                  DO 150 I = IB, IBEND
                      T( I, I ) = DIAG( I - IB + 1 )
- 90               CONTINUE
+ 150              CONTINUE
 *
-*                 Back substitution
+*                 Back substitution with block of solution.
 *
-                  IF( NB.EQ.1 ) THEN
-                     CALL CGEMV( 'N', IB - 1, NB,
-     $                           CNONE, T( 1, IB ), LDT,
-     $                           WORK( IB, JB ), 1,
-     $                           CONE, WORK( 1, JB ), 1)
-                  ELSE
-                     CALL CGEMM( 'N', 'N', IB - 1, MB, NB,
-     $                           CNONE, T( 1, IB ), LDT,
+                  NB = IBEND - IB + 1
+                  IF( IB.GT.IMIN ) THEN
+                     CALL CGEMM( 'N', 'N', IB - IMIN, MB, NB,
+     $                           CNONE, T( IMIN, IB ), LDT,
      $                           WORK( IB, JB ), N,
-     $                           CONE, WORK( 1, JB ), N )
+     $                           CONE, WORK( IMIN, JB ), N )
                   END IF
- 50            CONTINUE
+ 110           CONTINUE
 *
-*              Put scale factors on diagonal
+*              Put scale factors on diagonal to get triangular
+*              eigenvectors.
 *
-               DO 100 J = JB, JMAX
+               DO 160 J = JB, JBEND
                   WORK( JLIST( J ), J ) = SCALES( J )
- 100           CONTINUE
+ 160           CONTINUE
 *
-*              -------------------------------------------------
-*              Copy results to output
+*              -----------------------------------------------------
+*              Copy results to output.
+*                  
+               JOUT = JOUT - MB
+               IF( BACKTRANSFORM ) THEN
+*                  
+*                 Back transform with Schur vectors to get full
+*                 eigenvectors.
+*
+                  CALL CGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
+     $                        CONE, VR( 1, IMIN ), LDVR,
+     $                        WORK( IMIN, JB ), N,
+     $                        CZERO, WORK( 1, JMAX + JB ), N )
+                  VR( 1 : N, JOUT : JOUT + MB - 1 )
+     $                 = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
+               ELSE
+                  VR( 1 : IMIN - 1, JOUT : JOUT + MB - 1 ) = CZERO
+                  VR( IMIN : IMAX , JOUT : JOUT + MB - 1 )
+     $                 = WORK( IMIN : IMAX, JB : JBEND )
+                  VR( IMAX + 1 : N, JOUT : JOUT + MB - 1 ) = CZERO
+               END IF
+*              
+*              Workspace is now empty.
+*
+               IMIN = 1
+               IMAX = 0
+               JB = JMAX + 1
+               JBEND = JMAX
+            END IF
+ 100     CONTINUE
+*
+*        -----------------------------------------------------
+*        Normalize eigenvectors.
+*
+         DO 170 J = 1, M
+            I = ICAMAX( N, VR( 1, J ), 1 )
+            SCALE = ONE / CABS1( VR( I, J ) )
+            CALL CSSCAL( N, SCALE, VR( 1, J ), 1 )
+ 170     CONTINUE
+      END IF
+
+*
+*     --------------------------------------------------------------
+*     Compute left eigenvectors.
+*
+      IF( LEFTV ) THEN
+         IMIN = N + 1
+         IMAX = N
+         JB = 1
+         JBEND = 0
+         JOUT = 1
+         DO 300 JV = 1, N
+*
+*           --------------------------------------------------------
+*           Add current eigenvector to workspace if needed.
+*
+            IF( SOMEV ) THEN
+               SELECTV = SELECT( JV )
+            ELSE
+               SELECTV = .TRUE.
+            END IF
+            IF( SELECTV ) THEN
+               IMIN = MIN( IMIN, JV )
+               JBEND = JBEND + 1
+               WORK( IMIN : JV, JBEND ) = CZERO
+               DO 310 I = JV + 1, IMAX
+                  WORK( I, JBEND ) = -CONJG( T( JV, I ) )
+ 310           CONTINUE
+               JLIST( JBEND ) = JV
+               SHIFTS( JBEND ) = T( JV, JV )
+               BOUNDS( JBEND ) = SCASUM( IMAX - JV,
+     $                                   WORK( JV + 1, JBEND ), 1 )
+               IF( BOUNDS( JBEND ).GE.OVFL ) THEN
+                  SCALES( JBEND ) = HALF * OVFL / BOUNDS( JBEND )
+                  BOUNDS( JBEND ) = HALF * OVFL
+                  CALL CSSCAL( IMAX - JV, SCALES( JBEND ),
+     $                         WORK( JV + 1, JBEND ), 1 )
+               ELSE
+                  SCALES( JBEND ) = ONE
+               END IF
+            END IF
+*
+*           --------------------------------------------------------
+*           Process workspace if full or if all eigenvectors are
+*           found.
+*
+            IF( JBEND.EQ.JMAX .OR. ( JV.EQ.N .AND. JB.LE.JBEND ) ) THEN
+               MB = JBEND - JB + 1
+*
+*              -----------------------------------------------------
+*              Compute triangular eigenvectors with safe,
+*              multi-shift, blocked forward substitution.
+*
+               DO 320 IB = IMIN, IMAX, NBMAX
+                  IBEND = MIN( IB + NBMAX - 1, IMAX )
+                  NB = IBEND - IB + 1
+                  DO 330 I = IB, IBEND
+                     DIAG( I - IB + 1 ) = T( I, I )
+                     CNORMS( I - IB + 1 ) = SCASUM( I - IB,
+     $                                              T( IB, I ), 1 )
+ 330              CONTINUE
+                  TDIAGNORM = CLANGE( 'O', NB, NB,
+     $                                T( IB, IB ), LDT, CTEMP )
+                  TOFFNORM = CLANGE( 'O', NB, IMAX - IBEND,
+     $                               T( IB, IBEND + 1 ), LDT, CTEMP )
+                  DO 340 J = JB, JBEND
+                     NB = IBEND - MAX( JLIST( J ) + 1, IB ) + 1
+                     IF( NB.LE.0 )
+     $                    GO TO 340
+*                  
+*                    Safeguarded solve with shifted diagonal block.
+*
+                     TEMP = MAX( ULP * TDIAGNORM, SMLNUM )
+                     DO 350 I = IBEND - NB + 1, IBEND
+                        T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
+                        IF( CABS1( T( I, I ) ).LT.TEMP )
+     $                     T( I, I ) = CMPLX( TEMP )
+ 350                 CONTINUE
+                     I = IBEND - NB + 1
+                     CALL CLATRS( 'U', 'C', 'N', 'Y', NB,
+     $                            T( I, I ), LDT, WORK( I, J ), SCALE,
+     $                            CNORMS( I - IB + 1 ), INFO )
+*
+*                    Rescale solution (if needed).
+*
+                     VNORM = SCASUM( NB, WORK( I, J ), 1 )
+                     BOUNDS( J ) = BOUNDS( J ) * SCALE
+                     TEMP = OVFL - BOUNDS( J )
+                     IF( VNORM.GE.ONE
+     $                   .AND. TOFFNORM.GT.TEMP/VNORM ) THEN
+                        TEMP = ( OVFL * HALF / TOFFNORM ) / VNORM
+                        SCALE = TEMP * SCALE
+                        BOUNDS( J ) = TEMP * BOUNDS( J ) + OVFL * HALF
+                     ELSE IF( VNORM.LT.ONE
+     $                        .AND. TOFFNORM*VNORM.GT.TEMP ) THEN
+                        TEMP = OVFL * HALF / TOFFNORM
+                        SCALE = TEMP * SCALE
+                        BOUNDS( J ) = TEMP * BOUNDS( J )
+     $                                + OVFL * HALF * VNORM
+                     ELSE
+                        BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
+                     END IF
+                     IF( SCALE.NE.ONE ) THEN
+                        I = MAX( JLIST( J ) + 1, IB )
+                        CALL CSSCAL( IB - I, SCALE,
+     $                               WORK( I, J ), 1 )
+                        CALL CSSCAL( IMAX - IBEND, SCALE,
+     $                               WORK( IBEND + 1, J ), 1 )
+                        SCALES( J ) = SCALES( J ) * SCALE
+                     END IF
+ 340              CONTINUE
+                  DO 360 I = IB, IBEND
+                     T( I, I ) = DIAG( I - IB + 1 )
+ 360              CONTINUE
+*
+*                 Forward substitution with block of solution.
+*
+                  NB = IBEND - IB + 1
+                  IF( IBEND.LT.IMAX ) THEN
+                     CALL CGEMM( 'C', 'N', IMAX - IBEND, MB, NB,
+     $                           CNONE, T( IB, IBEND + 1 ), LDT,
+     $                           WORK( IB, JB ), N,
+     $                           CONE, WORK( IBEND + 1, JB ), N )
+                  END IF
+ 320           CONTINUE
+*
+*              Put scale factors on diagonal to get triangular
+*              eigenvectors.
+*
+               DO 370 J = JB, JBEND
+                  WORK( JLIST( J ), J ) = SCALES( J )
+ 370           CONTINUE
+*
+*              -----------------------------------------------------
+*              Copy results to output.
 *                  
                IF( BACKTRANSFORM ) THEN
 *                  
-*                 Back solve to get full eigenvectors
+*                 Back transform with Schur vectors to get full
+*                 eigenvectors.
 *
-                  IF( NB.EQ.1 ) THEN
-                     CALL CGEMV( 'N', N, IMAX,
-     $                           CNONE, VR, LDVR, WORK( 1, 1 ), 1,
-     $                           CZERO, WORK( 1, 2 ), 1)
-                  ELSE
-                     CALL CGEMM( 'N', 'N', N, MB, IMAX,
-     $                           CONE, VR, LDVR, WORK( 1, JB ), N,
-     $                           CZERO, WORK( 1, JMAX + JB ), N )
-                  END IF
-                  DO 110 J = JMAX, JB, -1
-                     SCALE = ONE / CLANGE( 'M', N, 1,
-     $                                     WORK( 1, JMAX + J ), N,
-     $                                     CTEMP )
-                     DO 120 I = N, 1, -1
-                        VR( I, JOUT ) = SCALE * WORK( I, JMAX + J )
- 120                 CONTINUE
-                     JOUT = JOUT - 1
- 110              CONTINUE
+                  CALL CGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
+     $                        CONE, VL( 1, IMIN ), LDVL,
+     $                        WORK( IMIN, JB ), N,
+     $                        CZERO, WORK( 1, JMAX + JB ), N )
+                  VL( 1 : N, JOUT : JOUT + MB - 1 )
+     $                 = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
                ELSE
-*                  
-*                 Copy triangular eigenvectors to output
-*
-                  DO 130 J = JMAX, JB, -1
-                     SCALE = ONE / CLANGE( 'M', JLIST( J ), 1,
-     $                                     WORK( 1, J ), N, CTEMP )
-                     DO 140 I = N, JLIST( J ), -1
-                        VR( I, JOUT ) = CZERO
- 140                 CONTINUE
-                     DO 150 I = JLIST( J ), 1, -1
-                        VR( I, JOUT ) = SCALE * WORK( I, J )
- 150                 CONTINUE
-                     JOUT = JOUT - 1
- 130              CONTINUE
-                  
+                  VL( 1 : IMIN - 1, JOUT : JOUT + MB - 1 ) = CZERO
+                  VL( IMIN : IMAX , JOUT : JOUT + MB - 1 )
+     $                 = WORK( IMIN : IMAX, JB : JBEND )
+                  VL( IMAX + 1 : N, JOUT : JOUT + MB - 1 ) = CZERO
                END IF
+               JOUT = JOUT + MB
 *                  
-*              Workspace is now empty
+*              Workspace is now empty.
 *
-               JB = 0
+               IMIN = N + 1
+               IMAX = N
+               JB = 1
+               JBEND = 0
             END IF
- 20      CONTINUE
+ 300     CONTINUE
+*
+*        -----------------------------------------------------
+*        Normalize eigenvectors.
+*
+         DO 380 J = 1, M
+            I = ICAMAX( N, VL( 1, J ), 1 )
+            SCALE = ONE / CABS1( VL( I, J ) )
+            CALL CSSCAL( N, SCALE, VL( 1, J ), 1 )
+ 380     CONTINUE
       END IF
-
-
-      IF( LEFTV ) THEN
-*     TODO
-      ENDIF
 
       RETURN
 *

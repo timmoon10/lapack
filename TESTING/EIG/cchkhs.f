@@ -50,7 +50,7 @@
 *>            w(1), ..., w(n); we define a diagonal matrix W whose
 *>            (diagonal) entries are the eigenvalues.
 *>
-*>            CTREVC computes the left eigenvector matrix L and the
+*>            CTREVC3 computes the left eigenvector matrix L and the
 *>            right eigenvector matrix R for the matrix T.  The
 *>            columns of L are the complex conjugates of the left
 *>            eigenvectors of T.  The columns of R are the right
@@ -466,8 +466,8 @@
 *     .. External Subroutines ..
       EXTERNAL           CCOPY, CGEHRD, CGEMM, CGET10, CGET22, CHSEIN,
      $                   CHSEQR, CHST01, CLACPY, CLASET, CLATME, CLATMR,
-     $                   CLATMS, CTREVC, CUNGHR, CUNMHR, SLABAD, SLAFTS,
-     $                   SLASUM, XERBLA
+     $                   CLATMS, CTREVC3, CUNGHR, CUNMHR, SLABAD,
+     $                   SLAFTS, SLASUM, XERBLA
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, MAX, MIN, REAL, SQRT
@@ -852,10 +852,10 @@
             DO 150 J = 1, N, 2
                SELECT( J ) = .TRUE.
   150       CONTINUE
-            CALL CTREVC( 'Right', 'All', SELECT, N, T1, LDA, CDUMMA,
-     $                   LDU, EVECTR, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL CTREVC3( 'Right', 'All', SELECT, N, T1, LDA, CDUMMA,
+     $                    LDU, EVECTR, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'CTREVC(R,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'CTREVC3(R,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -867,17 +867,17 @@
      $                   WORK, RWORK, DUMMA( 1 ) )
             RESULT( 9 ) = DUMMA( 1 )
             IF( DUMMA( 2 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Right', 'CTREVC',
+               WRITE( NOUNIT, FMT = 9998 )'Right', 'CTREVC3',
      $            DUMMA( 2 ), N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected right eigenvectors and confirm that
 *           they agree with previous right eigenvectors
 *
-            CALL CTREVC( 'Right', 'Some', SELECT, N, T1, LDA, CDUMMA,
-     $                   LDU, EVECTL, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL CTREVC3( 'Right', 'Some', SELECT, N, T1, LDA, CDUMMA,
+     $                    LDU, EVECTL, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'CTREVC(R,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'CTREVC3(R,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -888,7 +888,8 @@
             DO 170 J = 1, N
                IF( SELECT( J ) ) THEN
                   DO 160 JJ = 1, N
-                     IF( EVECTR( JJ, J ).NE.EVECTL( JJ, K ) ) THEN
+                     TEMP1 = ABS( EVECTR( JJ, J ) - EVECTL( JJ, K ) )
+                     IF( TEMP1 * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 180
                      END IF
@@ -898,7 +899,7 @@
   170       CONTINUE
   180       CONTINUE
             IF( .NOT.MATCH )
-     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'CTREVC', N, JTYPE,
+     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'CTREVC3', N, JTYPE,
      $         IOLDSD
 *
 *           Compute the Left eigenvector Matrix:

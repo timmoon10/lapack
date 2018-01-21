@@ -66,13 +66,13 @@
 *>      computed when only W, only W and VR, or only W and VL are
 *>      computed.
 *>
-*>    (6)     VR(full) = VR(partial)
+*>    (6)     | VR(full) - VR(partial) | / ulp
 *>
 *>      VR(full) denotes the right eigenvectors computed when both VR
 *>      and VL are computed, and VR(partial) denotes the result
 *>      when only VR is computed.
 *>
-*>     (7)     VL(full) = VL(partial)
+*>     (7)     | VL(full) - VL(partial) | / ulp
 *>
 *>      VL(full) denotes the left eigenvectors computed when both VR
 *>      and VL are also computed, and VL(partial) denotes the result
@@ -430,8 +430,8 @@
       INTEGER            IINFO, IMODE, ITYPE, IWK, J, JCOL, JJ, JSIZE,
      $                   JTYPE, MTYPES, N, NERRS, NFAIL, NMAX,
      $                   NNWORK, NTEST, NTESTF, NTESTT
-      REAL               ANORM, COND, CONDS, OVFL, RTULP, RTULPI, TNRM,
-     $                   ULP, ULPINV, UNFL, VMX, VRMX, VTST
+      REAL               ANORM, COND, CONDS, OVFL, RTULP, RTULPI, TEMP,
+     $                   TNRM, ULP, ULPINV, UNFL, VMX, VRMX, VTST
 *     ..
 *     .. Local Arrays ..
       INTEGER            IDUMMA( 1 ), IOLDSD( 4 ), KCONDS( MAXTYP ),
@@ -831,8 +831,8 @@
 *
                DO 180 J = 1, N
                   DO 170 JJ = 1, N
-                     IF( VR( J, JJ ).NE.LRE( J, JJ ) )
-     $                  RESULT( 6 ) = ULPINV
+                     TEMP = ABS( VR( J, JJ ) - LRE( J, JJ ) ) * ULPINV
+                     RESULT( 6 ) = MAX( RESULT( 6 ), TEMP )
   170             CONTINUE
   180          CONTINUE
 *
@@ -860,8 +860,8 @@
 *
                DO 210 J = 1, N
                   DO 200 JJ = 1, N
-                     IF( VL( J, JJ ).NE.LRE( J, JJ ) )
-     $                  RESULT( 7 ) = ULPINV
+                     TEMP = ABS( VL( J, JJ ) - LRE( J, JJ ) ) * ULPINV
+                     RESULT( 7 ) = MAX( RESULT( 7 ), TEMP )
   200             CONTINUE
   210          CONTINUE
 *
@@ -937,10 +937,8 @@
      $      / ' 4 = | |VL(i)| - 1 | / ulp ',
      $      / ' 5 = 0 if W same no matter if VR or VL computed,',
      $      ' 1/ulp otherwise', /
-     $      ' 6 = 0 if VR same no matter if VL computed,',
-     $      '  1/ulp otherwise', /
-     $      ' 7 = 0 if VL same no matter if VR computed,',
-     $      '  1/ulp otherwise', / )
+     $      ' 6 = | VR(full) - VR(partial) | / ulp', /
+     $      ' 7 = | VL(full) - VL(partial) | / ulp', / )
  9994 FORMAT( ' N=', I5, ', IWK=', I2, ', seed=', 4( I4, ',' ),
      $      ' type ', I2, ', test(', I2, ')=', G10.3 )
  9993 FORMAT( ' CDRVEV: ', A, ' returned INFO=', I6, '.', / 9X, 'N=',

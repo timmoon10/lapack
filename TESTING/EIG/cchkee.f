@@ -20,7 +20,7 @@
 *> eigenvalue problem.  The test paths in this version are
 *>
 *> NEP (Nonsymmetric Eigenvalue Problem):
-*>     Test CGEHRD, CUNGHR, CHSEQR, CTREVC, CHSEIN, and CUNMHR
+*>     Test CGEHRD, CUNGHR, CHSEQR, CTREVC3, CHSEIN, and CUNMHR
 *>
 *> SEP (Hermitian Eigenvalue Problem):
 *>     Test CHETRD, CUNGTR, CSTEQR, CSTERF, CSTEIN, CSTEDC,

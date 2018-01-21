@@ -427,7 +427,6 @@
 *        Compute left and/or right eigenvectors
 *        (CWorkspace: need 2*N, prefer 2*N*NB)
 *
-         IRWORK = IBAL + N
          CALL ZTREVC3( SIDE, 'B', SELECT, N, A, LDA, VL, LDVL, VR, LDVR,
      $                 N, NOUT, WORK( IWRK ), LWORK-IWRK+1, IERR )
       END IF
@@ -443,6 +442,7 @@
 *
 *        Normalize left eigenvectors and make largest component real
 *
+         IRWORK = IBAL + N
          DO 20 I = 1, N
             SCL = ONE / DZNRM2( N, VL( 1, I ), 1 )
             CALL ZDSCAL( N, SCL, VL( 1, I ), 1 )
@@ -468,6 +468,7 @@
 *
 *        Normalize right eigenvectors and make largest component real
 *
+         IRWORK = IBAL + N
          DO 40 I = 1, N
             SCL = ONE / DZNRM2( N, VR( 1, I ), 1 )
             CALL ZDSCAL( N, SCL, VR( 1, I ), 1 )
