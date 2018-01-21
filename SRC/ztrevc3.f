@@ -252,24 +252,23 @@
       PARAMETER          ( CZERO = ( 0.0D+0, 0.0D+0 ),
      $                     CONE  = ( 1.0D+0, 0.0D+0 ),
      $                     CNONE = ( -1.0D+0, 0.0D+0 ) )
-      INTEGER            NBMAX, MBMIN, MBMAX
-      PARAMETER          ( NBMAX = 32, MBMIN = 8, MBMAX = 128 )
+      INTEGER            NBMAX, MBMAX
+      PARAMETER          ( NBMAX = 32, MBMAX = 128 )
 *     ..
 *     .. Local Scalars ..
       LOGICAL            LEFTV, RIGHTV, BACKTRANSFORM, SOMEV, SELECTV
-      DOUBLE PRECISION   UNFL, OVFL, ULP, SMLNUM, SCALE, TNORM, VNORM,
-     $                   TEMP
+      DOUBLE PRECISION   UNFL, OVFL, ULP, SMLNUM, SCALE,
+     $                   TOFFNORM, TDIAGNORM, VNORM, TEMP
       COMPLEX*16         CTEMP
-      CHARACTER          NORMIN
       INTEGER            I, IB, IBEND, IMIN, IMAX,
      $                   J, JV, JB, JBEND, JOUT, JMAX,
      $                   NB, MB
 *     ..
 *     .. Local Arrays ..
-      INTEGER            JLIST( NBMAX )
-      DOUBLE PRECISION   SCALES( NBMAX ), BOUNDS( NBMAX ),
+      INTEGER            JLIST( MBMAX )
+      DOUBLE PRECISION   SCALES( MBMAX ), BOUNDS( MBMAX ),
      $                   CNORMS( NBMAX )
-      COMPLEX*16         SHIFTS( NBMAX ), DIAG( NBMAX )
+      COMPLEX*16         SHIFTS( MBMAX ), DIAG( NBMAX )
 *     ..
 *     .. External Functions ..
       LOGICAL            LSAME
@@ -278,7 +277,7 @@
       EXTERNAL           LSAME, ILAENV, DLAMCH, IZAMAX, DZASUM, ZLANGE
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           XERBLA, DLABAD, ZDSCAL, ZGEMM, ZLACPY, ZLATRS
+      EXTERNAL           XERBLA, DLABAD, ZDSCAL, ZGEMM, ZLATRS
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, DBLE, DCMPLX, AIMAG, CONJG, MIN, MAX
@@ -345,13 +344,9 @@
       IF( N.EQ.0 )
      $   RETURN
 *
-*     Use blocked version of back-transformation if sufficient workspace.
+*     Determine block size
 *
-      IF( LWORK .GE. 2*N*MBMIN ) THEN
-         JMAX = MIN( LWORK / (2*N), NBMAX )
-      ELSE
-         JMAX = 1
-      END IF
+      JMAX = MIN( LWORK / (2*N), MBMAX )
 *
 *     Set the constants to control overflow.
 *
@@ -366,13 +361,15 @@
 *     Compute right eigenvectors.
 *
       IF( RIGHTV ) THEN
-         JOUT = M
+         IMIN = 1
+         IMAX = 0
          JB = JMAX + 1
          JBEND = JMAX
+         JOUT = M + 1
          DO 100 JV = N, 1, -1
 *
 *           --------------------------------------------------------
-*           Add current eigenvector to workspace (if needed).
+*           Add current eigenvector to workspace if needed.
 *
             IF( SOMEV ) THEN
                SELECTV = SELECT( JV )
@@ -380,19 +377,18 @@
                SELECTV = .TRUE.
             END IF
             IF( SELECTV ) THEN
-               IF( JB.GT.JBEND ) THEN
-                  IMAX = JV
-               END IF
+               IMAX = MAX( IMAX, JV )
                JB = JB - 1
-               WORK( 1 : JV - 1, JB ) = -T( 1 : JV - 1, JV )
-               WORK( JV : N, JB ) = CZERO
+               WORK( IMIN : JV - 1, JB ) = -T( IMIN : JV - 1, JV )
+               WORK( JV : IMAX, JB ) = CZERO
                JLIST( JB ) = JV
                SHIFTS( JB ) = T( JV, JV )
-               BOUNDS( JB ) = DZASUM( JV - 1, WORK( 1, JB ), 1 )
-               IF( BOUNDS( JB ).GT.OVFL ) THEN
+               BOUNDS( JB ) = DZASUM( JV - IMIN, WORK( IMIN, JB ), 1 )
+               IF( BOUNDS( JB ).GE.OVFL ) THEN
                   SCALES( JB ) = HALF * OVFL / BOUNDS( JB )
                   BOUNDS( JB ) = HALF * OVFL
-                  CALL ZDSCAL( JV - 1, SCALES( JB ), WORK( 1, JB ), 1 )
+                  CALL ZDSCAL( JV - IMIN, SCALES( JB ),
+     $                         WORK( IMIN, JB ), 1 )
                ELSE
                   SCALES( JB ) = ONE
                END IF
@@ -409,57 +405,60 @@
 *              Compute triangular eigenvectors with safe,
 *              multi-shift, blocked back substitution.
 *     
-               DO 110 IBEND = IMAX, 1, -NBMAX
-                  IB = MAX( IBEND - NBMAX + 1, 1 )
+               DO 110 IBEND = IMAX, IMIN, -NBMAX
+                  IB = MAX( IBEND - NBMAX + 1, IMIN )
+                  NB = IBEND - IB + 1
                   DO 120 I = IB, IBEND
                      DIAG( I - IB + 1 ) = T( I, I )
+                     CNORMS( I - IB + 1 ) = DZASUM( I - IB,
+     $                                              T( IB, I ), 1 )
  120              CONTINUE
-                  TNORM = ZLANGE( 'O', IB - 1, MB,
-     $                            T( 1, IB ), LDT, CTEMP )
-                  DO 130 J = JBEND, JB, -1
+                  TDIAGNORM = ZLANGE( 'O', NB, NB,
+     $                                T( IB, IB ), LDT, CTEMP )
+                  TOFFNORM = ZLANGE( 'O', IB - IMIN, NB,
+     $                               T( IMIN, IB ), LDT, CTEMP )
+                  DO 130 J = JB, JBEND
                      NB = MIN( JLIST( J ) - 1, IBEND) - IB + 1
                      IF( NB.LE.0 )
      $                  GO TO 130
 *                  
 *                    Safeguarded solve with shifted diagonal block.
 *
-                     TEMP = MAX( ULP * CABS1( SHIFTS( J ) ), SMLNUM )
+                     TEMP = MAX( ULP * TDIAGNORM, SMLNUM )
                      DO 140 I = IB, IB + NB - 1
                         T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
                         IF( CABS1( T( I, I ) ).LT.TEMP )
      $                     T( I, I ) = DCMPLX( TEMP )
  140                 CONTINUE
-                     IF( J.EQ.JBEND ) THEN
-                        NORMIN = 'N'
-                     ELSE
-                        NORMIN = 'Y'
-                     END IF
-                     CALL ZLATRS( 'U', 'N', 'N', NORMIN, NB,
+                     CALL ZLATRS( 'U', 'N', 'N', 'Y', NB,
      $                            T( IB, IB ), LDT,
      $                            WORK( IB, J ), SCALE,
-     $                            CNORMS, INFO )
+     $                            CNORMS( 1 ), INFO )
 *
 *                    Rescale solution (if needed).
 *
                      VNORM = DZASUM( NB, WORK( IB, J ), 1 )
                      BOUNDS( J ) = BOUNDS( J ) * SCALE
                      TEMP = OVFL - BOUNDS( J )
-                     IF( VNORM.GE.ONE .AND. TNORM.GT.TEMP/VNORM ) THEN
-                        TEMP = ( OVFL * HALF / TNORM ) / VNORM
+                     IF( VNORM.GE.ONE
+     $                   .AND. TOFFNORM.GT.TEMP/VNORM ) THEN
+                        TEMP = ( OVFL * HALF / TOFFNORM ) / VNORM
                         SCALE = TEMP * SCALE
                         BOUNDS( J ) = TEMP * BOUNDS( J ) + OVFL * HALF
                      ELSE IF( VNORM.LT.ONE
-     $                        .AND. TNORM*VNORM.GT.TEMP ) THEN
-                        TEMP = OVFL * HALF / TNORM
+     $                        .AND. TOFFNORM*VNORM.GT.TEMP ) THEN
+                        TEMP = OVFL * HALF / TOFFNORM
                         SCALE = TEMP * SCALE
                         BOUNDS( J ) = TEMP * BOUNDS( J )
      $                                + OVFL * HALF * VNORM
                      ELSE
-                        BOUNDS( J ) = BOUNDS( J ) + TNORM * VNORM
+                        BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                      END IF
                      IF( SCALE.NE.ONE ) THEN
-                        CALL ZDSCAL( IB - 1, SCALE, WORK( 1, J ), 1 )
-                        CALL ZDSCAL( JLIST( J ) - IBEND - 1, SCALE,
+                        I = MIN( JLIST( J ) - 1, IBEND )
+                        CALL ZDSCAL( IB - IMIN, SCALE,
+     $                               WORK( IMIN, J ), 1 )
+                        CALL ZDSCAL( I - IBEND, SCALE,
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
                      END IF
@@ -471,11 +470,11 @@
 *                 Back substitution with block of solution.
 *
                   NB = IBEND - IB + 1
-                  IF( IB.GT.1 ) THEN
-                     CALL ZGEMM( 'N', 'N', IB - 1, MB, NB,
-     $                           CNONE, T( 1, IB ), LDT,
+                  IF( IB.GT.IMIN ) THEN
+                     CALL ZGEMM( 'N', 'N', IB - IMIN, MB, NB,
+     $                           CNONE, T( IMIN, IB ), LDT,
      $                           WORK( IB, JB ), N,
-     $                           CONE, WORK( 1, JB ), N )
+     $                           CONE, WORK( IMIN, JB ), N )
                   END IF
  110           CONTINUE
 *
@@ -489,27 +488,31 @@
 *              -----------------------------------------------------
 *              Copy results to output.
 *                  
-               JOUT = JOUT - MB + 1
+               JOUT = JOUT - MB
                IF( BACKTRANSFORM ) THEN
 *                  
 *                 Back transform with Schur vectors to get full
 *                 eigenvectors.
 *
-                  CALL ZGEMM( 'N', 'N', N, MB, IMAX,
-     $                        CONE, VR, LDVR, WORK( 1, JB ), N,
+                  CALL ZGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
+     $                        CONE, VR( 1, IMIN ), LDVR,
+     $                        WORK( IMIN, JB ), N,
      $                        CZERO, WORK( 1, JMAX + JB ), N )
-                  CALL ZLACPY( 'F', N, MB,
-     $                         WORK( 1, JMAX + JB ), N,
-     $                         VR( 1, JOUT ), LDVR )
+                  VR( 1 : N, JOUT : JOUT + MB - 1 )
+     $                 = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
                ELSE
-                  CALL ZLACPY( 'F', N, MB,
-     $                         WORK( 1, JB ), N,
-     $                         VR( 1, JOUT ), LDVR )
+                  VR( 1 : IMIN - 1, JOUT : JOUT + MB - 1 ) = CZERO
+                  VR( IMIN : IMAX , JOUT : JOUT + MB - 1 )
+     $                 = WORK( IMIN : IMAX, JB : JBEND )
+                  VR( IMAX + 1 : N, JOUT : JOUT + MB - 1 ) = CZERO
                END IF
 *              
 *              Workspace is now empty.
 *
+               IMIN = 1
+               IMAX = 0
                JB = JMAX + 1
+               JBEND = JMAX
             END IF
  100     CONTINUE
 *
@@ -528,13 +531,15 @@
 *     Compute left eigenvectors.
 *
       IF( LEFTV ) THEN
-         JOUT = 1
+         IMIN = N + 1
+         IMAX = N
          JB = 1
          JBEND = 0
+         JOUT = 1
          DO 300 JV = 1, N
 *
 *           --------------------------------------------------------
-*           Add current eigenvector to workspace (if needed).
+*           Add current eigenvector to workspace if needed.
 *
             IF( SOMEV ) THEN
                SELECTV = SELECT( JV )
@@ -542,22 +547,20 @@
                SELECTV = .TRUE.
             END IF
             IF( SELECTV ) THEN
-               IF( JBEND.EQ.0 ) THEN
-                  IMIN = JV
-               END IF
+               IMIN = MIN( IMIN, JV )
                JBEND = JBEND + 1
-               WORK( 1 : JV, JBEND ) = CZERO
-               DO 310 I = JV + 1, N
+               WORK( IMIN : JV, JBEND ) = CZERO
+               DO 310 I = JV + 1, IMAX
                   WORK( I, JBEND ) = -CONJG( T( JV, I ) )
  310           CONTINUE
                JLIST( JBEND ) = JV
                SHIFTS( JBEND ) = T( JV, JV )
-               BOUNDS( JBEND ) = DZASUM( N - JV,
+               BOUNDS( JBEND ) = DZASUM( IMAX - JV,
      $                                   WORK( JV + 1, JBEND ), 1 )
-               IF( BOUNDS( JBEND ).GT.OVFL ) THEN
+               IF( BOUNDS( JBEND ).GE.OVFL ) THEN
                   SCALES( JBEND ) = HALF * OVFL / BOUNDS( JBEND )
                   BOUNDS( JBEND ) = HALF * OVFL
-                  CALL ZDSCAL( N - JV, SCALES( JBEND ),
+                  CALL ZDSCAL( IMAX - JV, SCALES( JBEND ),
      $                         WORK( JV + 1, JBEND ), 1 )
                ELSE
                   SCALES( JBEND ) = ONE
@@ -575,13 +578,18 @@
 *              Compute triangular eigenvectors with safe,
 *              multi-shift, blocked forward substitution.
 *
-               DO 320 IB = IMIN, N, NBMAX
-                  IBEND = MIN( IB + NBMAX - 1, N )
+               DO 320 IB = IMIN, IMAX, NBMAX
+                  IBEND = MIN( IB + NBMAX - 1, IMAX )
+                  NB = IBEND - IB + 1
                   DO 330 I = IB, IBEND
                      DIAG( I - IB + 1 ) = T( I, I )
+                     CNORMS( I - IB + 1 ) = DZASUM( I - IB,
+     $                                              T( IB, I ), 1 )
  330              CONTINUE
-                  TNORM = ZLANGE( 'O', MB, N - IBEND,
-     $                            T( IB, IBEND + 1 ), LDT, CTEMP )
+                  TDIAGNORM = ZLANGE( 'O', NB, NB,
+     $                                T( IB, IB ), LDT, CTEMP )
+                  TOFFNORM = ZLANGE( 'O', NB, IMAX - IBEND,
+     $                               T( IB, IBEND + 1 ), LDT, CTEMP )
                   DO 340 J = JB, JBEND
                      NB = IBEND - MAX( JLIST( J ) + 1, IB ) + 1
                      IF( NB.LE.0 )
@@ -589,45 +597,41 @@
 *                  
 *                    Safeguarded solve with shifted diagonal block.
 *
-                     TEMP = MAX( ULP * CABS1( SHIFTS( J ) ), SMLNUM )
+                     TEMP = MAX( ULP * TDIAGNORM, SMLNUM )
                      DO 350 I = IBEND - NB + 1, IBEND
                         T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
                         IF( CABS1( T( I, I ) ).LT.TEMP )
      $                     T( I, I ) = DCMPLX( TEMP )
  350                 CONTINUE
-                     IF( J.EQ.JB ) THEN
-                        NORMIN = 'N'
-                     ELSE
-                        NORMIN = 'Y'
-                     END IF
-                     CALL ZLATRS( 'U', 'C', 'N', NORMIN, NB,
-     $                            T( IBEND - NB + 1, IBEND - NB + 1 ),
-     $                            LDT,
-     $                            WORK( IBEND - NB + 1, J ), SCALE,
-     $                            CNORMS, INFO )
+                     I = IBEND - NB + 1
+                     CALL ZLATRS( 'U', 'C', 'N', 'Y', NB,
+     $                            T( I, I ), LDT, WORK( I, J ), SCALE,
+     $                            CNORMS( I - IB + 1 ), INFO )
 *
 *                    Rescale solution (if needed).
 *
-                     VNORM = DZASUM( NB, WORK( IBEND - NB + 1, J ), 1 )
+                     VNORM = DZASUM( NB, WORK( I, J ), 1 )
                      BOUNDS( J ) = BOUNDS( J ) * SCALE
                      TEMP = OVFL - BOUNDS( J )
-                     IF( VNORM.GE.ONE .AND. TNORM.GT.TEMP/VNORM ) THEN
-                        TEMP = ( OVFL * HALF / TNORM ) / VNORM
+                     IF( VNORM.GE.ONE
+     $                   .AND. TOFFNORM.GT.TEMP/VNORM ) THEN
+                        TEMP = ( OVFL * HALF / TOFFNORM ) / VNORM
                         SCALE = TEMP * SCALE
                         BOUNDS( J ) = TEMP * BOUNDS( J ) + OVFL * HALF
                      ELSE IF( VNORM.LT.ONE
-     $                        .AND. TNORM*VNORM.GT.TEMP ) THEN
-                        TEMP = OVFL * HALF / TNORM
+     $                        .AND. TOFFNORM*VNORM.GT.TEMP ) THEN
+                        TEMP = OVFL * HALF / TOFFNORM
                         SCALE = TEMP * SCALE
                         BOUNDS( J ) = TEMP * BOUNDS( J )
      $                                + OVFL * HALF * VNORM
                      ELSE
-                        BOUNDS( J ) = BOUNDS( J ) + TNORM * VNORM
+                        BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                      END IF
                      IF( SCALE.NE.ONE ) THEN
-                        CALL ZDSCAL( IB - JLIST( J ) - 1, SCALE,
-     $                               WORK( JLIST( J ) + 1, J ), 1 )
-                        CALL ZDSCAL( N - IBEND, SCALE,
+                        I = MAX( JLIST( J ) + 1, IB )
+                        CALL ZDSCAL( IB - I, SCALE,
+     $                               WORK( I, J ), 1 )
+                        CALL ZDSCAL( IMAX - IBEND, SCALE,
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
                      END IF
@@ -639,8 +643,8 @@
 *                 Forward substitution with block of solution.
 *
                   NB = IBEND - IB + 1
-                  IF( IBEND.LT.N ) THEN
-                     CALL ZGEMM( 'C', 'N', N - IBEND, MB, NB,
+                  IF( IBEND.LT.IMAX ) THEN
+                     CALL ZGEMM( 'C', 'N', IMAX - IBEND, MB, NB,
      $                           CNONE, T( IB, IBEND + 1 ), LDT,
      $                           WORK( IB, JB ), N,
      $                           CONE, WORK( IBEND + 1, JB ), N )
@@ -662,22 +666,25 @@
 *                 Back transform with Schur vectors to get full
 *                 eigenvectors.
 *
-                  CALL ZGEMM( 'N', 'N', N, MB, N - IMIN + 1,
+                  CALL ZGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
      $                        CONE, VL( 1, IMIN ), LDVL,
      $                        WORK( IMIN, JB ), N,
      $                        CZERO, WORK( 1, JMAX + JB ), N )
-                  CALL ZLACPY( 'F', N, MB,
-     $                         WORK( 1, JMAX + JB ), N,
-     $                         VL( 1, JOUT ), LDVL )
+                  VL( 1 : N, JOUT : JOUT + MB - 1 )
+     $                 = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
                ELSE
-                  CALL ZLACPY( 'F', N, MB,
-     $                         WORK( 1, JB ), N,
-     $                         VL( 1, JOUT ), LDVL )
+                  VL( 1 : IMIN - 1, JOUT : JOUT + MB - 1 ) = CZERO
+                  VL( IMIN : IMAX , JOUT : JOUT + MB - 1 )
+     $                 = WORK( IMIN : IMAX, JB : JBEND )
+                  VL( IMAX + 1 : N, JOUT : JOUT + MB - 1 ) = CZERO
                END IF
                JOUT = JOUT + MB
 *                  
 *              Workspace is now empty.
 *
+               IMIN = N + 1
+               IMAX = N
+               JB = 1
                JBEND = 0
             END IF
  300     CONTINUE

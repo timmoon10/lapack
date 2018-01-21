@@ -888,7 +888,8 @@
             DO 170 J = 1, N
                IF( SELECT( J ) ) THEN
                   DO 160 JJ = 1, N
-                     IF( EVECTR( JJ, J ).NE.EVECTL( JJ, K ) ) THEN
+                     TEMP1 = ABS( EVECTR( JJ, J ) - EVECTL( JJ, K ) )
+                     IF( TEMP * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 180
                      END IF
@@ -942,7 +943,8 @@
             DO 200 J = 1, N
                IF( SELECT( J ) ) THEN
                   DO 190 JJ = 1, N
-                     IF( EVECTL( JJ, J ).NE.EVECTR( JJ, K ) ) THEN
+                     TEMP1 = ABS( EVECTL( JJ, J ) - EVECTR( JJ, K ) )
+                     IF( TEMP * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 210
                      END IF
