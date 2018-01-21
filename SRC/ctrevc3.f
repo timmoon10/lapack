@@ -302,10 +302,10 @@
 *
       IF( SOMEV ) THEN
          M = 0
-         DO 10 J = 1, N
+         DO J = 1, N
             IF( SELECT( J ) )
      $         M = M + 1
-   10    CONTINUE
+         END DO
       ELSE
          M = N
       END IF
@@ -366,7 +366,7 @@
          JB = JMAX + 1
          JBEND = JMAX
          JOUT = M + 1
-         DO 100 JV = N, 1, -1
+         DO JV = N, 1, -1
 *
 *           --------------------------------------------------------
 *           Add current eigenvector to workspace if needed.
@@ -405,31 +405,31 @@
 *              Compute triangular eigenvectors with safe,
 *              multi-shift, blocked back substitution.
 *     
-               DO 110 IBEND = IMAX, IMIN, -NBMAX
+               DO IBEND = IMAX, IMIN, -NBMAX
                   IB = MAX( IBEND - NBMAX + 1, IMIN )
                   NB = IBEND - IB + 1
-                  DO 120 I = IB, IBEND
+                  DO I = IB, IBEND
                      DIAG( I - IB + 1 ) = T( I, I )
                      CNORMS( I - IB + 1 ) = SCASUM( I - IB,
      $                                              T( IB, I ), 1 )
- 120              CONTINUE
+                  END DO
                   TDIAGNORM = CLANGE( 'O', NB, NB,
      $                                T( IB, IB ), LDT, CTEMP )
                   TOFFNORM = CLANGE( 'O', IB - IMIN, NB,
      $                               T( IMIN, IB ), LDT, CTEMP )
-                  DO 130 J = JB, JBEND
+                  DO J = JB, JBEND
                      NB = MIN( JLIST( J ) - 1, IBEND) - IB + 1
                      IF( NB.LE.0 )
-     $                  GO TO 130
+     $                    CYCLE
 *                  
 *                    Safeguarded solve with shifted diagonal block.
 *
                      TEMP = MAX( ULP * TDIAGNORM, SMLNUM )
-                     DO 140 I = IB, IB + NB - 1
+                     DO I = IB, IB + NB - 1
                         T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
                         IF( CABS1( T( I, I ) ).LT.TEMP )
      $                     T( I, I ) = CMPLX( TEMP )
- 140                 CONTINUE
+                     END DO
                      CALL CLATRS( 'U', 'N', 'N', 'Y', NB,
      $                            T( IB, IB ), LDT,
      $                            WORK( IB, J ), SCALE,
@@ -462,10 +462,10 @@
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
                      END IF
- 130              CONTINUE
-                  DO 150 I = IB, IBEND
+                  END DO
+                  DO I = IB, IBEND
                      T( I, I ) = DIAG( I - IB + 1 )
- 150              CONTINUE
+                  END DO
 *
 *                 Back substitution with block of solution.
 *
@@ -476,14 +476,14 @@
      $                           WORK( IB, JB ), N,
      $                           CONE, WORK( IMIN, JB ), N )
                   END IF
- 110           CONTINUE
+               END DO
 *
 *              Put scale factors on diagonal to get triangular
 *              eigenvectors.
 *
-               DO 160 J = JB, JBEND
+               DO J = JB, JBEND
                   WORK( JLIST( J ), J ) = SCALES( J )
- 160           CONTINUE
+               END DO
 *
 *              -----------------------------------------------------
 *              Copy results to output.
@@ -514,16 +514,16 @@
                JB = JMAX + 1
                JBEND = JMAX
             END IF
- 100     CONTINUE
+         END DO
 *
 *        -----------------------------------------------------
 *        Normalize eigenvectors.
 *
-         DO 170 J = 1, M
+         DO J = 1, M
             I = ICAMAX( N, VR( 1, J ), 1 )
             SCALE = ONE / CABS1( VR( I, J ) )
             CALL CSSCAL( N, SCALE, VR( 1, J ), 1 )
- 170     CONTINUE
+         END DO
       END IF
 
 *
@@ -536,7 +536,7 @@
          JB = 1
          JBEND = 0
          JOUT = 1
-         DO 300 JV = 1, N
+         DO JV = 1, N
 *
 *           --------------------------------------------------------
 *           Add current eigenvector to workspace if needed.
@@ -550,9 +550,9 @@
                IMIN = MIN( IMIN, JV )
                JBEND = JBEND + 1
                WORK( IMIN : JV, JBEND ) = CZERO
-               DO 310 I = JV + 1, IMAX
+               DO I = JV + 1, IMAX
                   WORK( I, JBEND ) = -CONJG( T( JV, I ) )
- 310           CONTINUE
+               END DO
                JLIST( JBEND ) = JV
                SHIFTS( JBEND ) = T( JV, JV )
                BOUNDS( JBEND ) = SCASUM( IMAX - JV,
@@ -578,31 +578,31 @@
 *              Compute triangular eigenvectors with safe,
 *              multi-shift, blocked forward substitution.
 *
-               DO 320 IB = IMIN, IMAX, NBMAX
+               DO IB = IMIN, IMAX, NBMAX
                   IBEND = MIN( IB + NBMAX - 1, IMAX )
                   NB = IBEND - IB + 1
-                  DO 330 I = IB, IBEND
+                  DO I = IB, IBEND
                      DIAG( I - IB + 1 ) = T( I, I )
                      CNORMS( I - IB + 1 ) = SCASUM( I - IB,
      $                                              T( IB, I ), 1 )
- 330              CONTINUE
+                  END DO
                   TDIAGNORM = CLANGE( 'O', NB, NB,
      $                                T( IB, IB ), LDT, CTEMP )
                   TOFFNORM = CLANGE( 'O', NB, IMAX - IBEND,
      $                               T( IB, IBEND + 1 ), LDT, CTEMP )
-                  DO 340 J = JB, JBEND
+                  DO J = JB, JBEND
                      NB = IBEND - MAX( JLIST( J ) + 1, IB ) + 1
                      IF( NB.LE.0 )
-     $                    GO TO 340
+     $                    CYCLE
 *                  
 *                    Safeguarded solve with shifted diagonal block.
 *
                      TEMP = MAX( ULP * TDIAGNORM, SMLNUM )
-                     DO 350 I = IBEND - NB + 1, IBEND
+                     DO I = IBEND - NB + 1, IBEND
                         T( I, I ) = DIAG( I - IB + 1 ) - SHIFTS( J )
                         IF( CABS1( T( I, I ) ).LT.TEMP )
      $                     T( I, I ) = CMPLX( TEMP )
- 350                 CONTINUE
+                     END DO
                      I = IBEND - NB + 1
                      CALL CLATRS( 'U', 'C', 'N', 'Y', NB,
      $                            T( I, I ), LDT, WORK( I, J ), SCALE,
@@ -635,10 +635,10 @@
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
                      END IF
- 340              CONTINUE
-                  DO 360 I = IB, IBEND
+                  END DO
+                  DO I = IB, IBEND
                      T( I, I ) = DIAG( I - IB + 1 )
- 360              CONTINUE
+                  END DO
 *
 *                 Forward substitution with block of solution.
 *
@@ -649,14 +649,14 @@
      $                           WORK( IB, JB ), N,
      $                           CONE, WORK( IBEND + 1, JB ), N )
                   END IF
- 320           CONTINUE
+               END DO
 *
 *              Put scale factors on diagonal to get triangular
 *              eigenvectors.
 *
-               DO 370 J = JB, JBEND
+               DO J = JB, JBEND
                   WORK( JLIST( J ), J ) = SCALES( J )
- 370           CONTINUE
+               END DO
 *
 *              -----------------------------------------------------
 *              Copy results to output.
@@ -687,16 +687,16 @@
                JB = 1
                JBEND = 0
             END IF
- 300     CONTINUE
+         END DO
 *
 *        -----------------------------------------------------
 *        Normalize eigenvectors.
 *
-         DO 380 J = 1, M
+         DO J = 1, M
             I = ICAMAX( N, VL( 1, J ), 1 )
             SCALE = ONE / CABS1( VL( I, J ) )
             CALL CSSCAL( N, SCALE, VL( 1, J ), 1 )
- 380     CONTINUE
+         END DO
       END IF
 
       RETURN
