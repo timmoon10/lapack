@@ -427,6 +427,7 @@
 *        Compute left and/or right eigenvectors
 *        (CWorkspace: need 2*N, prefer 2*N*NB)
 *
+         IRWORK = IBAL + N
          CALL ZTREVC3( SIDE, 'B', SELECT, N, A, LDA, VL, LDVL, VR, LDVR,
      $                 N, NOUT, WORK( IWRK ), LWORK-IWRK+1, IERR )
       END IF
