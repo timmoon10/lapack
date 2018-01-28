@@ -455,7 +455,7 @@
                         BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                      END IF
                      IF( SCALE.NE.ONE ) THEN
-                        I = MIN( JLIST( J ) - 1, IBEND )
+                        I = MAX( JLIST( J ) - 1, IBEND )
                         CALL ZDSCAL( IB - IMIN, SCALE,
      $                               WORK( IMIN, J ), 1 )
                         CALL ZDSCAL( I - IBEND, SCALE,
@@ -628,7 +628,7 @@
                         BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                      END IF
                      IF( SCALE.NE.ONE ) THEN
-                        I = MAX( JLIST( J ) + 1, IB )
+                        I = MIN( JLIST( J ) + 1, IB )
                         CALL ZDSCAL( IB - I, SCALE,
      $                               WORK( I, J ), 1 )
                         CALL ZDSCAL( IMAX - IBEND, SCALE,
