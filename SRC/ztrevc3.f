@@ -253,7 +253,7 @@
      $                     CONE  = ( 1.0D+0, 0.0D+0 ),
      $                     CNONE = ( -1.0D+0, 0.0D+0 ) )
       INTEGER            NBMAX, MBMAX
-      PARAMETER          ( NBMAX = 32, MBMAX = 128 )
+      PARAMETER          ( NBMAX = 64, MBMAX = 64 )
 *     ..
 *     .. Local Scalars ..
       LOGICAL            LEFTV, RIGHTV, BACKTRANSFORM, SOMEV, SELECTV
@@ -273,8 +273,8 @@
 *     .. External Functions ..
       LOGICAL            LSAME
       INTEGER            ILAENV, IZAMAX
-      DOUBLE PRECISION   DLAMCH, DZASUM, ZLANGE
-      EXTERNAL           LSAME, ILAENV, DLAMCH, IZAMAX, DZASUM, ZLANGE
+      DOUBLE PRECISION   DLAMCH, DZASUM
+      EXTERNAL           LSAME, ILAENV, DLAMCH, IZAMAX, DZASUM
 *     ..
 *     .. External Subroutines ..
       EXTERNAL           XERBLA, DLABAD, ZDSCAL, ZGEMM, ZLATRS
@@ -408,21 +408,34 @@
                DO IBEND = IMAX, IMIN, -NBMAX
                   IB = MAX( IBEND - NBMAX + 1, IMIN )
                   NB = IBEND - IB + 1
+*
+*                 Analyze diagonal block and off-diagonal block.
+*
+                  TDIAGNORM = ZERO
+                  TOFFNORM = ZERO
                   DO I = IB, IBEND
+                     TEMP = DZASUM( I - IB, T( IB, I ), 1 )
                      DIAG( I - IB + 1 ) = T( I, I )
-                     CNORMS( I - IB + 1 ) = DZASUM( I - IB,
-     $                                              T( IB, I ), 1 )
+                     CNORMS( I - IB + 1 ) = TEMP
+                     TDIAGNORM = TDIAGNORM + TEMP + CABS1( T( I, I ) )
                   END DO
-                  TDIAGNORM = ZLANGE( 'O', NB, NB,
-     $                                T( IB, IB ), LDT, CTEMP )
-                  TOFFNORM = ZLANGE( 'O', IB - IMIN, NB,
-     $                               T( IMIN, IB ), LDT, CTEMP )
+                  DO I = IMIN, IB - 1, NBMAX
+                     TEMP = ZERO
+                     DO J = IB, IBEND
+                        TEMP = TEMP + DZASUM( MIN( IB - I, NBMAX ),
+     $                                        T( I, J ), 1 )
+                     END DO
+                     TOFFNORM = MAX( TOFFNORM, TEMP )
+                  END DO
+*
+*                 Solve each RHS against diagonal block.
+*
                   DO J = JB, JBEND
                      NB = MIN( JLIST( J ) - 1, IBEND) - IB + 1
                      IF( NB.LE.0 )
      $                    CYCLE
 *                  
-*                    Safeguarded solve with shifted diagonal block.
+*                    Safeguarded solve against shifted diagonal block.
 *
                      TEMP = MAX( ULP * TDIAGNORM, SMLNUM )
                      DO I = IB, IB + NB - 1
@@ -581,15 +594,24 @@
                DO IB = IMIN, IMAX, NBMAX
                   IBEND = MIN( IB + NBMAX - 1, IMAX )
                   NB = IBEND - IB + 1
+*
+*                 Analyze diagonal block and off-diagonal block.
+*
+                  TDIAGNORM = ZERO
+                  TOFFNORM = ZERO
                   DO I = IB, IBEND
+                     TEMP = DZASUM( I - IB, T( IB, I ), 1 )
                      DIAG( I - IB + 1 ) = T( I, I )
-                     CNORMS( I - IB + 1 ) = DZASUM( I - IB,
-     $                                              T( IB, I ), 1 )
+                     CNORMS( I - IB + 1 ) = TEMP
+                     TDIAGNORM = TDIAGNORM + TEMP + CABS1( T( I, I ) )
                   END DO
-                  TDIAGNORM = ZLANGE( 'O', NB, NB,
-     $                                T( IB, IB ), LDT, CTEMP )
-                  TOFFNORM = ZLANGE( 'O', NB, IMAX - IBEND,
-     $                               T( IB, IBEND + 1 ), LDT, CTEMP )
+                  DO J = IBEND + 1, IMAX
+                     TOFFNORM = MAX( TOFFNORM,
+     $                               DZASUM( NB, T( IB, J ), 1 ) )
+                  END DO
+*
+*                 Solve each RHS against diagonal block.
+*
                   DO J = JB, JBEND
                      NB = IBEND - MAX( JLIST( J ) + 1, IB ) + 1
                      IF( NB.LE.0 )
