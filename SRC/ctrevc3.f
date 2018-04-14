@@ -483,12 +483,11 @@
 *                 Back substitution with block of solution.
 *
                   NB = IBEND - IB + 1
-                  IF( IB.GT.IMIN ) THEN
-                     CALL CGEMM( 'N', 'N', IB - IMIN, MB, NB,
-     $                           CNONE, T( IMIN, IB ), LDT,
-     $                           WORK( IB, JB ), N,
-     $                           CONE, WORK( IMIN, JB ), N )
-                  END IF
+                  IF( IB.GT.IMIN )
+     $                 CALL CGEMM( 'N', 'N', IB - IMIN, MB, NB,
+     $                             CNONE, T( IMIN, IB ), LDT,
+     $                             WORK( IB, JB ), N,
+     $                             CONE, WORK( IMIN, JB ), N )
                END DO
 *
 *              Put scale factors on diagonal to get triangular
@@ -665,12 +664,11 @@
 *                 Forward substitution with block of solution.
 *
                   NB = IBEND - IB + 1
-                  IF( IBEND.LT.IMAX ) THEN
-                     CALL CGEMM( 'C', 'N', IMAX - IBEND, MB, NB,
-     $                           CNONE, T( IB, IBEND + 1 ), LDT,
-     $                           WORK( IB, JB ), N,
-     $                           CONE, WORK( IBEND + 1, JB ), N )
-                  END IF
+                  IF( IBEND.LT.IMAX )
+     $                 CALL CGEMM( 'C', 'N', IMAX - IBEND, MB, NB,
+     $                             CNONE, T( IB, IBEND + 1 ), LDT,
+     $                             WORK( IB, JB ), N,
+     $                             CONE, WORK( IBEND + 1, JB ), N )
                END DO
 *
 *              Put scale factors on diagonal to get triangular
