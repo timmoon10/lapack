@@ -48,7 +48,7 @@
 *>            DHSEQR factors H as  Z T Z' , where Z is orthogonal and
 *>            T is "quasi-triangular", and the eigenvalue vector W.
 *>
-*>            DTREVC computes the left and right eigenvector matrices
+*>            DTREVC3 computes the left and right eigenvector matrices
 *>            L and R for T.
 *>
 *>            DHSEIN computes the left and right eigenvector matrices
@@ -464,7 +464,7 @@
       EXTERNAL           DCOPY, DGEHRD, DGEMM, DGET10, DGET22, DHSEIN,
      $                   DHSEQR, DHST01, DLABAD, DLACPY, DLAFTS, DLASET,
      $                   DLASUM, DLATME, DLATMR, DLATMS, DORGHR, DORMHR,
-     $                   DTREVC, XERBLA
+     $                   DTREVC3, XERBLA
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, DBLE, MAX, MIN, SQRT
@@ -875,10 +875,10 @@
             IF( J.GT.0 )
      $         GO TO 140
 *
-            CALL DTREVC( 'Right', 'All', SELECT, N, T1, LDA, DUMMA, LDU,
-     $                   EVECTR, LDU, N, IN, WORK, IINFO )
+            CALL DTREVC3( 'Right', 'All', SELECT, N, T1, LDA, DUMMA,
+     $                    LDU, EVECTR, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'DTREVC(R,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'DTREVC3(R,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250
@@ -890,17 +890,17 @@
      $                   WI1, WORK, DUMMA( 1 ) )
             RESULT( 9 ) = DUMMA( 1 )
             IF( DUMMA( 2 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Right', 'DTREVC',
+               WRITE( NOUNIT, FMT = 9998 )'Right', 'DTREVC3',
      $            DUMMA( 2 ), N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected right eigenvectors and confirm that
 *           they agree with previous right eigenvectors
 *
-            CALL DTREVC( 'Right', 'Some', SELECT, N, T1, LDA, DUMMA,
-     $                   LDU, EVECTL, LDU, N, IN, WORK, IINFO )
+            CALL DTREVC3( 'Right', 'Some', SELECT, N, T1, LDA, DUMMA,
+     $                    LDU, EVECTL, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'DTREVC(R,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'DTREVC3(R,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250
@@ -911,7 +911,8 @@
             DO 170 J = 1, N
                IF( SELECT( J ) .AND. WI1( J ).EQ.ZERO ) THEN
                   DO 150 JJ = 1, N
-                     IF( EVECTR( JJ, J ).NE.EVECTL( JJ, K ) ) THEN
+                     TEMP1 = ABS( EVECTR( JJ, J ) - EVECTL( JJ, K ) )
+                     IF( TEMP1 * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 180
                      END IF
@@ -919,8 +920,11 @@
                   K = K + 1
                ELSE IF( SELECT( J ) .AND. WI1( J ).NE.ZERO ) THEN
                   DO 160 JJ = 1, N
-                     IF( EVECTR( JJ, J ).NE.EVECTL( JJ, K ) .OR.
-     $                   EVECTR( JJ, J+1 ).NE.EVECTL( JJ, K+1 ) ) THEN
+                     TEMP1 = ABS( EVECTR( JJ, J ) - EVECTL( JJ, K ) )
+                     TEMP2 = ABS( EVECTR( JJ, J+1 )
+     $                            - EVECTL( JJ, K+1 ) )
+                     IF( TEMP1 * ULPINV.GT.THRESH
+     $                   .OR. TEMP2 * ULPINV.GT.THRESH) THEN
                         MATCH = .FALSE.
                         GO TO 180
                      END IF
@@ -930,17 +934,18 @@
   170       CONTINUE
   180       CONTINUE
             IF( .NOT.MATCH )
-     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'DTREVC', N, JTYPE,
+     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'DTREVC3', N, JTYPE,
      $         IOLDSD
 *
 *           Compute the Left eigenvector Matrix:
 *
             NTEST = 10
             RESULT( 10 ) = ULPINV
-            CALL DTREVC( 'Left', 'All', SELECT, N, T1, LDA, EVECTL, LDU,
-     $                   DUMMA, LDU, N, IN, WORK, IINFO )
+            CALL DTREVC3( 'Left', 'All', SELECT, N, T1, LDA,
+     $                    EVECTL, LDU, DUMMA, LDU,
+     $                    N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'DTREVC(L,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'DTREVC3(L,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250
@@ -952,17 +957,17 @@
      $                   WR1, WI1, WORK, DUMMA( 3 ) )
             RESULT( 10 ) = DUMMA( 3 )
             IF( DUMMA( 4 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Left', 'DTREVC', DUMMA( 4 ),
+               WRITE( NOUNIT, FMT = 9998 )'Left', 'DTREVC3', DUMMA( 4 ),
      $            N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected left eigenvectors and confirm that
 *           they agree with previous left eigenvectors
 *
-            CALL DTREVC( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
-     $                   LDU, DUMMA, LDU, N, IN, WORK, IINFO )
+            CALL DTREVC3( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
+     $                    LDU, DUMMA, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'DTREVC(L,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'DTREVC3(L,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250
@@ -973,7 +978,8 @@
             DO 210 J = 1, N
                IF( SELECT( J ) .AND. WI1( J ).EQ.ZERO ) THEN
                   DO 190 JJ = 1, N
-                     IF( EVECTL( JJ, J ).NE.EVECTR( JJ, K ) ) THEN
+                     TEMP1 = ABS( EVECTL( JJ, J ) - EVECTR( JJ, K ) )
+                     IF( TEMP1 * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 220
                      END IF
@@ -981,8 +987,11 @@
                   K = K + 1
                ELSE IF( SELECT( J ) .AND. WI1( J ).NE.ZERO ) THEN
                   DO 200 JJ = 1, N
-                     IF( EVECTL( JJ, J ).NE.EVECTR( JJ, K ) .OR.
-     $                   EVECTL( JJ, J+1 ).NE.EVECTR( JJ, K+1 ) ) THEN
+                     TEMP1 = ABS( EVECTL( JJ, J ) - EVECTR( JJ, K ) )
+                     TEMP2 = ABS( EVECTL( JJ, J+1 )
+     $                            - EVECTR( JJ, K+1 ) )
+                     IF( TEMP1 * ULPINV.GT.THRESH
+     $                   .OR. TEMP2 * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 220
                      END IF
@@ -992,7 +1001,7 @@
   210       CONTINUE
   220       CONTINUE
             IF( .NOT.MATCH )
-     $         WRITE( NOUNIT, FMT = 9997 )'Left', 'DTREVC', N, JTYPE,
+     $         WRITE( NOUNIT, FMT = 9997 )'Left', 'DTREVC3', N, JTYPE,
      $         IOLDSD
 *
 *           Call DHSEIN for Right eigenvectors of H, do test 11

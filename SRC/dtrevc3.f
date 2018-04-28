@@ -276,10 +276,11 @@
       EXTERNAL           LSAME, ILAENV, DLAMCH, DASUM
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           XERBLA, DLABAD, DAXPY, DSCAL, DGEMM
+      EXTERNAL           XERBLA, DLABAD, DAXPY, DSCAL, DLALN2, DGEMM,
+     $                   DTREVC
 *     ..
 *     .. Intrinsic Functions ..
-      INTRINSIC          ABS, DBLE, DCMPLX, AIMAG, CONJG, MIN, MAX,
+      INTRINSIC          ABS, DBLE, DCMPLX, DIMAG, CONJG, MIN, MAX,
      $                   MAXVAL
 *     ..
 *     .. Statement Functions ..
@@ -287,7 +288,7 @@
 *     ..
 *     .. Statement Function definitions ..
       SQ( TEMP ) = TEMP * TEMP
-      CABS1( CTEMP ) = ABS( DBLE( CTEMP ) ) + ABS( AIMAG( CTEMP ) )
+      CABS1( CTEMP ) = ABS( DBLE( CTEMP ) ) + ABS( DIMAG( CTEMP ) )
 *     ..
 *     .. Executable Statements ..
 *
@@ -345,8 +346,11 @@
          INFO = -10
       ELSE IF( MM.LT.M ) THEN
          INFO = -11
-      ELSE IF( LWORK.LT.MAX( 1, 2*N ) .AND. LWORK.NE.-1 ) THEN
-         INFO = -14
+      ELSE IF(LWORK.NE.-1) THEN
+         IF( ( BACKTRANSFORM .AND. LWORK.LT.MAX( 1, 4*N ) )
+     $       .OR. LWORK.LT.MAX( 1, 2*N ) ) THEN
+            INFO = -14
+         END IF
       END IF
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'DTREVC3', -INFO )
@@ -362,7 +366,11 @@
 *
 *     Determine block size
 *
-      JMAX = MIN( LWORK / (2*N), MBMAX )
+      IF( BACKTRANSFORM ) THEN
+         JMAX = MIN( LWORK / (2*N), MBMAX )
+      ELSE
+         JMAX = MIN( LWORK / N, MBMAX )
+      END IF
 *
 *     Set the constants to control overflow.
 *
@@ -443,8 +451,15 @@
 *
                   D = T( JV : JV+1, JV : JV+1 )
                   SHIFT = DCMPLX( HALF * ( D(1,1) + D(2,2) ) )
-                  TEMP = - D(1,2) * D(2,1) - SQ( D(1,1) - D(2,2) ) / 4
-                  TEMP = SQRT( MAX( TEMP, SMLNUM ) )
+                  IF( D(1,1) .NE. D(2,2)
+     $                .OR. D(2,1) * D(1,2) .GT. ZERO ) THEN
+                     TEMP = -D(1,2) * D(2,1) - SQ( D(1,1) - D(2,2) ) / 4
+                     TEMP = SQRT( MAX( TEMP, SMLNUM ) )
+                  ELSE IF( D(2,1) .LT. ZERO ) THEN
+                     TEMP = SQRT( -D(2,1) ) * SQRT( D(1,2) )
+                  ELSE
+                     TEMP = SQRT( D(2,1) ) * SQRT( -D(1,2) )
+                  END IF
                   SHIFT = SHIFT + DCMPLX( ZERO, TEMP )
 *
 *                 Compute eigenvectors of 2x2 diagonal block
@@ -455,11 +470,11 @@
                   B( 1, 1 ) = -D( 2, 1 )
                   B( 2, 1 ) = D( 1, 1 ) - DBLE( SHIFT )
                   B( 1, 2 ) = ZERO
-                  B( 2, 2 ) = AIMAG( SHIFT )
+                  B( 2, 2 ) = DIMAG( SHIFT )
                   B = B / SUM( ABS( B ) )
                   CALL DLALN2( .FALSE., 2, 2, SMIN,
      $                         ONE, D, 2, ONE, ONE, B, 2,
-     $                         DBLE( SHIFT ), AIMAG( SHIFT ), X, 2,
+     $                         DBLE( SHIFT ), DIMAG( SHIFT ), X, 2,
      $                         SCALE, XNORM, IERR )
                   X = X / XNORM
 *
@@ -481,7 +496,7 @@
      $                           WORK( IMIN, JB+1 ), 1 )
                   END IF
                   SHIFTS( JB ) = SHIFT
-                  VDIAGS( JB:JB+1 , 1:2 ) = X
+                  VDIAGS( JB:JB+1 , : ) = X
                   VBOUNDS( JB ) = BOUND
                END SELECT
             END IF
@@ -578,7 +593,7 @@
      $                                     ONE, ONE,
      $                                     WORK( K, J ), N,
      $                                     DBLE( SHIFT ),
-     $                                     AIMAG( SHIFT ),
+     $                                     DIMAG( SHIFT ),
      $                                     X, 2, SCALE, XNORM, IERR )
                               TEMP = OVFL - BOUND
                               IF( XNORM.GE.ONE
@@ -615,18 +630,18 @@
      $                                     ONE, ONE,
      $                                     WORK( K, J ), N,
      $                                     DBLE( SHIFT ),
-     $                                     AIMAG( SHIFT ),
+     $                                     DIMAG( SHIFT ),
      $                                     X, 2, SCALE, XNORM, IERR )
                               TEMP = OVFL - BOUND
                               IF( XNORM.GE.ONE
      $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
                                  TEMP = ( OVFL * HALF / CNORM ) / XNORM
-                                 X( 1:2, 1 ) = TEMP * X( 1:2, 1 )
+                                 X( : , 1 ) = TEMP * X( : , 1 )
                                  SCALE = TEMP * SCALE
                               ELSE IF( XNORM.LT.ONE
      $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
                                  TEMP = OVFL * HALF / CNORM
-                                 X( 1:2, 1 ) = TEMP * X( 1:2, 1 )
+                                 X( : , 1 ) = TEMP * X( : , 1 )
                                  SCALE = TEMP * SCALE
                               ELSE
                                  BOUND = XNORM * CNORM + BOUND
@@ -636,7 +651,7 @@
      $                                       WORK( IMIN, J ), 1 )
                                  VDIAG( 1, 1 ) = SCALE * VDIAG( 1, 1 )
                               END IF
-                              WORK( K:K+1, J ) = X( 1:2, 1 )
+                              WORK( K:K+1, J ) = X( : , 1 )
                               CALL DGEMM( 'N', 'N', K - IB, 1, 2,
      $                                    NEGONE, T( IB, K ), LDT,
      $                                    WORK( K, J ), N,
@@ -672,7 +687,7 @@
 *
 *                       Solve complex RHS against diagonal block.
 *
-                        VDIAG = VDIAGS( J:J+1, 1:2 )
+                        VDIAG = VDIAGS( J:J+1, : )
                         DO K = IB + NB - 1, IB, -1
                            CNORM = CNORMS( K - IB + 1 )
                            SELECT CASE( TDSIZES( K - IB + 1 ) )
@@ -685,18 +700,18 @@
      $                                     ONE, ONE,
      $                                     WORK( K, J ), N,
      $                                     DBLE( SHIFT ),
-     $                                     AIMAG( SHIFT ),
+     $                                     DIMAG( SHIFT ),
      $                                     X, 2, SCALE, XNORM, IERR )
                               TEMP = OVFL - BOUND
                               IF( XNORM.GE.ONE
      $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
                                  TEMP = ( OVFL * HALF / CNORM ) / XNORM
-                                 X( 1, 1:2 ) = TEMP * X( 1, 1:2 )
+                                 X( 1, : ) = TEMP * X( 1, : )
                                  SCALE = TEMP * SCALE
                               ELSE IF( XNORM.LT.ONE
      $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
                                  TEMP = OVFL * HALF / CNORM
-                                 X( 1, 1:2 ) = TEMP * X( 1, 1:2 )
+                                 X( 1, : ) = TEMP * X( 1, : )
                                  SCALE = TEMP * SCALE
                               ELSE
                                  BOUND = XNORM * CNORM + BOUND
@@ -708,14 +723,14 @@
      $                                       WORK( IMIN, J+1 ), 1 )
                                  VDIAG = SCALE * VDIAG
                               END IF
-                              WORK( K, J:J+1 ) = X( 1, 1:2 )
+                              WORK( K, J:J+1 ) = X( 1, : )
                               CALL DGEMM( 'N', 'N', K - IB, 2, 1,
      $                                    NEGONE, T( IB, K ), LDT,
      $                                    WORK( K, J ), N,
      $                                    ONE, WORK( IB, J ), N )
                               IF( SCALE.NE.ONE )
-     $                             BOUND = SUM( ABS( WORK( IMIN:(K-1),
-     $                                                     J:(J+1) ) ) )
+     $                             BOUND = SUM( ABS( WORK( IMIN : K-1,
+     $                                                     J : J+1 ) ) )
                            CASE( 2 )
 *
 *                             2x2 diagonal block with complex RHS.
@@ -725,7 +740,7 @@
      $                                     ONE, ONE,
      $                                     WORK( K, J ), N,
      $                                     DBLE( SHIFT ),
-     $                                     AIMAG( SHIFT ),
+     $                                     DIMAG( SHIFT ),
      $                                     X, 2, SCALE, XNORM, IERR )
                               TEMP = OVFL - BOUND
                               IF( XNORM.GE.ONE
@@ -754,16 +769,16 @@
      $                                    WORK( K, J ), N,
      $                                    ONE, WORK( IB, J ), N )
                               IF( SCALE.NE.ONE )
-     $                             BOUND = SUM( ABS( WORK( IMIN:(K-1),
-     $                                                     J:(J+1) ) ) )
+     $                             BOUND = SUM( ABS( WORK( IMIN:K-1,
+     $                                                     J:J+1 ) ) )
                            END SELECT
                         END DO
 *
 *                       Rescale complex RHS for back substitution.
 *
                         SCALE = ONE
-                        XNORM = SUM( ABS( WORK( IB:(IB+NB-1),
-     $                                          J:(J+1) ) ))
+                        XNORM = SUM( ABS( WORK( IB:IB+NB-1,
+     $                                          J:J+1 ) ))
                         TEMP = OVFL - BOUND
                         IF( XNORM.GE.ONE
      $                      .AND. TOFFNORM.GT.TEMP/XNORM ) THEN
@@ -778,11 +793,11 @@
                            CALL DSCAL( JLIST( J ) - IMIN, SCALE,
      $                                 WORK( IMIN, J+1 ), 1 )
                            VDIAG = SCALE * VDIAG
-                           BOUND = SUM( ABS( WORK( IMIN:(IB-1),
-     $                                             J:(J+1) ) ) )
+                           BOUND = SUM( ABS( WORK( IMIN:IB-1,
+     $                                             J:J+1 ) ) )
                         END IF
                         VBOUNDS( J ) = BOUND
-                        VDIAGS( J:J+1, 1:2 ) = VDIAG
+                        VDIAGS( J:J+1, : ) = VDIAG
                      END IF
                   END DO
 *
@@ -805,7 +820,7 @@
                   CASE( 1 )
                      WORK( I, J ) = VDIAGS( J, 1 )
                   CASE( 2 )
-                     WORK( I:I+1, J:J+1 ) = VDIAGS( J:J+1, 1:2 )
+                     WORK( I:I+1, J:J+1 ) = VDIAGS( J:(J+1), : )
                   END SELECT
                END DO
 *
@@ -837,7 +852,7 @@
                   J = JOUT + K - JB
                   SELECT CASE( VDSIZES( K ) )
                   CASE( 1 )
-                     SCALE = ONE / MAXVAL( ABS( VR( :, J ) ) )
+                     SCALE = ONE / MAXVAL( ABS( VR( : , J ) ) )
                      CALL DSCAL( N, SCALE, VR( 1, J ), 1 )
                   CASE( 2 )
                      BOUND = SMLNUM
@@ -864,8 +879,11 @@
 *
 *     --------------------------------------------------------------
 *     Compute left eigenvectors.
-*
+*     TODO
+*     
       IF( LEFTV ) THEN
+         CALL DTREVC( 'L', HOWMNY, SELECT, N,
+     $                T, LDT, VL, LDVL, VR, LDVR, MM, M, WORK, INFO )
       END IF
 
       RETURN

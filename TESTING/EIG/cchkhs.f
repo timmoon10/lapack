@@ -906,10 +906,11 @@
 *
             NTEST = 10
             RESULT( 10 ) = ULPINV
-            CALL CTREVC( 'Left', 'All', SELECT, N, T1, LDA, EVECTL, LDU,
-     $                   CDUMMA, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL CTREVC3( 'Left', 'All', SELECT, N, T1, LDA,
+     $                    EVECTL, LDU, CDUMMA, LDU,
+     $                    N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'CTREVC(L,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'CTREVC3(L,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -921,17 +922,17 @@
      $                   WORK, RWORK, DUMMA( 3 ) )
             RESULT( 10 ) = DUMMA( 3 )
             IF( DUMMA( 4 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Left', 'CTREVC', DUMMA( 4 ),
+               WRITE( NOUNIT, FMT = 9998 )'Left', 'CTREVC3', DUMMA( 4 ),
      $            N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected left eigenvectors and confirm that
 *           they agree with previous left eigenvectors
 *
-            CALL CTREVC( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
-     $                   LDU, CDUMMA, LDU, N, IN, WORK, RWORK, IINFO )
+            CALL CTREVC3( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
+     $                    LDU, CDUMMA, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'CTREVC(L,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'CTREVC3(L,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 240
@@ -953,7 +954,7 @@
   200       CONTINUE
   210       CONTINUE
             IF( .NOT.MATCH )
-     $         WRITE( NOUNIT, FMT = 9997 )'Left', 'CTREVC', N, JTYPE,
+     $         WRITE( NOUNIT, FMT = 9997 )'Left', 'CTREVC3', N, JTYPE,
      $         IOLDSD
 *
 *           Call CHSEIN for Right eigenvectors of H, do test 11

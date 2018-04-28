@@ -20,7 +20,7 @@
 *> eigenvalue problem.  The test paths in this version are
 *>
 *> NEP (Nonsymmetric Eigenvalue Problem):
-*>     Test DGEHRD, DORGHR, DHSEQR, DTREVC, DHSEIN, and DORMHR
+*>     Test DGEHRD, DORGHR, DHSEQR, DTREVC3, DHSEIN, and DORMHR
 *>
 *> SEP (Symmetric Eigenvalue Problem):
 *>     Test DSYTRD, DORGTR, DSTEQR, DSTERF, DSTEIN, DSTEDC,
