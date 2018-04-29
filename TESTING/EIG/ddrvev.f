@@ -81,7 +81,7 @@
 *>      and VL are computed, and VR(partial) denotes the result
 *>      when only VR is computed.
 *>
-*>     (7)     | VL(full) - VL(partial) | / ulp
+*>    (7)     | VL(full) - VL(partial) | / ulp
 *>
 *>      VL(full) denotes the left eigenvectors computed when both VR
 *>      and VL are also computed, and VL(partial) denotes the result

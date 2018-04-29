@@ -69,13 +69,13 @@
 *>      eigenvalues computed when only some of VR, VL, RCONDV, and
 *>      RCONDE are computed.
 *>
-*>    (6)     0 if VR(full) = VR(partial), 1/ulp otherwise
+*>    (6)     | VR(full) - VR(partial) | / ulp
 *>
 *>      VR(full) denotes the right eigenvectors computed when VL, RCONDV
 *>      and RCONDE are computed, and VR(partial) denotes the result
 *>      when only some of VL and RCONDV are computed.
 *>
-*>    (7)     0 if VL(full) = VL(partial), 1/ulp otherwise
+*>    (7)     | VL(full) - VL(partial) | / ulp
 *>
 *>      VL(full) denotes the left eigenvectors computed when VR, RCONDV
 *>      and RCONDE are computed, and VL(partial) denotes the result
@@ -404,9 +404,9 @@
       CHARACTER          SENSE
       INTEGER            I, IHI, IHI1, IINFO, ILO, ILO1, ISENS, ISENSM,
      $                   J, JJ, KMIN
-      DOUBLE PRECISION   ABNRM, ABNRM1, EPS, SMLNUM, TNRM, TOL, TOLIN,
-     $                   ULP, ULPINV, V, VMAX, VMX, VRICMP, VRIMIN,
-     $                   VRMX, VTST
+      DOUBLE PRECISION   ABNRM, ABNRM1, EPS, SMLNUM, TEMP, TNRM, TOL,
+     $                   TOLIN, ULP, ULPINV, V, VMAX, VMX, VRICMP,
+     $                   VRIMIN, VRMX, VTST
       COMPLEX*16         CTMP
 *     ..
 *     .. Local Arrays ..
@@ -641,8 +641,8 @@
 *
          DO 110 J = 1, N
             DO 100 JJ = 1, N
-               IF( VR( J, JJ ).NE.LRE( J, JJ ) )
-     $            RESULT( 6 ) = ULPINV
+               TEMP = ABS( VR( J, JJ ) - LRE( J, JJ ) ) * ULPINV
+               RESULT( 6 ) = MAX( RESULT( 6 ), TEMP )
   100       CONTINUE
   110    CONTINUE
 *
@@ -700,8 +700,8 @@
 *
          DO 160 J = 1, N
             DO 150 JJ = 1, N
-               IF( VL( J, JJ ).NE.LRE( J, JJ ) )
-     $            RESULT( 7 ) = ULPINV
+               TEMP = ABS( VL( J, JJ ) - LRE( J, JJ ) ) * ULPINV
+               RESULT( 7 ) = MAX( RESULT( 7 ), TEMP )
   150       CONTINUE
   160    CONTINUE
 *

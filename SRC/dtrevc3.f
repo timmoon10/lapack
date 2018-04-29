@@ -346,11 +346,8 @@
          INFO = -10
       ELSE IF( MM.LT.M ) THEN
          INFO = -11
-      ELSE IF(LWORK.NE.-1) THEN
-         IF( ( BACKTRANSFORM .AND. LWORK.LT.MAX( 1, 4*N ) )
-     $       .OR. LWORK.LT.MAX( 1, 2*N ) ) THEN
-            INFO = -14
-         END IF
+      ELSE IF( LWORK.NE.-1 .AND. LWORK.LT.MAX( 1, 3*N ) ) THEN
+         INFO = -14
       END IF
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'DTREVC3', -INFO )
@@ -367,7 +364,11 @@
 *     Determine block size
 *
       IF( BACKTRANSFORM ) THEN
-         JMAX = MIN( LWORK / (2*N), MBMAX )
+         IF( LWORK .GE. 4*N ) THEN
+            JMAX = MIN( LWORK / (2*N), MBMAX )
+         ELSE
+            JMAX = 2
+         END IF
       ELSE
          JMAX = MIN( LWORK / N, MBMAX )
       END IF
@@ -826,19 +827,38 @@
 *
 *              -----------------------------------------------------
 *              Copy results to output.
-*                  
+*              Note: Back transform with Schur vectors if full
+*              eigenvectors are requested.
+*     
                JOUT = JOUT - MB
                IF( BACKTRANSFORM ) THEN
+                  IF( LWORK .GE. 4*N ) THEN
 *                  
-*                 Back transform with Schur vectors to get full
-*                 eigenvectors.
+*                    Blocked back transform.
 *
-                  CALL DGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
-     $                        ONE, VR( 1, IMIN ), LDVR,
-     $                        WORK( IMIN, JB ), N,
-     $                        ZERO, WORK( 1, JMAX + JB ), N )
-                  VR( 1 : N, JOUT : JOUT + MB - 1 )
-     $                 = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
+                     CALL DGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
+     $                           ONE, VR( 1, IMIN ), LDVR,
+     $                           WORK( IMIN, JB ), N,
+     $                           ZERO, WORK( 1, JMAX + JB ), N )
+                     VR( 1 : N, JOUT : JOUT + MB - 1 )
+     $                    = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
+                  ELSE
+*                    
+*                    Back transform with minimal workspace
+*                    
+                     CALL DGEMV( 'N', N, IMAX - IMIN + 1,
+     $                           ONE, VR( 1, IMIN ), LDVR,
+     $                           WORK( IMIN, 2 ), 1,
+     $                           ZERO, WORK( 1, 3 ), 1 )
+                     IF( MB.EQ.2 )
+     $                    CALL DGEMV( 'N', N, IMAX - IMIN + 1,
+     $                                ONE, VR( 1, IMIN ), LDVR,
+     $                                WORK( IMIN, 1 ), 1,
+     $                                ZERO, WORK( 1, 2 ), 1 )
+                     VR( 1 : N, JOUT : JOUT + MB - 1 )
+     $                    = WORK( 1 : N, 1 + JB : 1 + JBEND )
+                     
+                  END IF
                ELSE
                   VR( 1 : IMIN - 1, JOUT : JOUT + MB - 1 ) = ZERO
                   VR( IMIN : IMAX , JOUT : JOUT + MB - 1 )

@@ -439,7 +439,7 @@
       IF( WANTVL .OR. WANTVR ) THEN
 *
 *        Compute left and/or right eigenvectors
-*        (Workspace: need 4*N, prefer 2*N*NB)
+*        (Workspace: need 3*N, prefer 2*N*NB)
 *
          CALL DTREVC3( SIDE, 'B', SELECT, N, A, LDA, VL, LDVL, VR, LDVR,
      $                 N, NOUT, WORK( IWRK ), LWORK-IWRK+1, IERR )
@@ -455,7 +455,6 @@
 *
 *        Normalize left eigenvectors and make largest component real
 *
-         IWRK = IBAL + N
          DO 20 I = 1, N
             IF( WI( I ).EQ.ZERO ) THEN
                SCL = ONE / DNRM2( N, VL( 1, I ), 1 )
@@ -486,7 +485,6 @@
 *
 *        Normalize right eigenvectors and make largest component real
 *
-         IWRK = IBAL + N
          DO 40 I = 1, N
             IF( WI( I ).EQ.ZERO ) THEN
                SCL = ONE / DNRM2( N, VR( 1, I ), 1 )

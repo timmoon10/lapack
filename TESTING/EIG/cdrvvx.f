@@ -76,13 +76,13 @@
 *>      eigenvalues computed when only some of VR, VL, RCONDV, and
 *>      RCONDE are computed.
 *>
-*>    (6)     VR(full) = VR(partial)
+*>    (6)     | VR(full) - VR(partial) | / ulp
 *>
 *>      VR(full) denotes the right eigenvectors computed when VL, RCONDV
 *>      and RCONDE are computed, and VR(partial) denotes the result
 *>      when only some of VL and RCONDV are computed.
 *>
-*>    (7)     VL(full) = VL(partial)
+*>    (7)     | VL(full) - VL(partial) | / ulp
 *>
 *>      VL(full) denotes the left eigenvectors computed when VR, RCONDV
 *>      and RCONDE are computed, and VL(partial) denotes the result
