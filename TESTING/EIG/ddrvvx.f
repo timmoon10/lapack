@@ -996,10 +996,8 @@
      $      / ' 4 = | |VL(i)| - 1 | / ulp ',
      $      / ' 5 = 0 if W same no matter if VR or VL computed,',
      $      ' 1/ulp otherwise', /
-     $      ' 6 = 0 if VR same no matter what else computed,',
-     $      '  1/ulp otherwise', /
-     $      ' 7 = 0 if VL same no matter what else computed,',
-     $      '  1/ulp otherwise', /
+     $      ' 6 = | VR(full) - VR(partial) | / ulp', /
+     $      ' 7 = | VL(full) - VL(partial) | / ulp', /
      $      ' 8 = 0 if RCONDV same no matter what else computed,',
      $      '  1/ulp otherwise', /
      $      ' 9 = 0 if SCALE, ILO, IHI, ABNRM same no matter what else',

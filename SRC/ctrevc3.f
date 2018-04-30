@@ -174,7 +174,7 @@
 *>
 *> \param[out] WORK
 *> \verbatim
-*>          WORK is COMPLEX array, dimension (MAX(1,LWORK))
+*>          WORK is COMPLEX array, dimension (LWORK)
 *> \endverbatim
 *>
 *> \param[in] LWORK

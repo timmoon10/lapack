@@ -174,7 +174,7 @@
 *>
 *> \param[out] WORK
 *> \verbatim
-*>          WORK is COMPLEX*16 array, dimension (MAX(1,LWORK))
+*>          WORK is COMPLEX*16 array, dimension (LWORK)
 *> \endverbatim
 *>
 *> \param[in] LWORK
@@ -207,7 +207,7 @@
 *
 *> \date November 2017
 *
-*> \ingroup complexOTHERcomputational
+*> \ingroup complex16OTHERcomputational
 *
 *> \par Further Details:
 *  =====================
