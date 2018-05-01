@@ -20,7 +20,7 @@
 *> eigenvalue problem.  The test paths in this version are
 *>
 *> NEP (Nonsymmetric Eigenvalue Problem):
-*>     Test SGEHRD, SORGHR, SHSEQR, STREVC, SHSEIN, and SORMHR
+*>     Test SGEHRD, SORGHR, SHSEQR, STREVC3, SHSEIN, and SORMHR
 *>
 *> SEP (Symmetric Eigenvalue Problem):
 *>     Test SSYTRD, SORGTR, SSTEQR, SSTERF, SSTEIN, SSTEDC,

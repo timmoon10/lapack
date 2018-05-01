@@ -48,7 +48,7 @@
 *>            SHSEQR factors H as  Z T Z' , where Z is orthogonal and
 *>            T is "quasi-triangular", and the eigenvalue vector W.
 *>
-*>            STREVC computes the left and right eigenvector matrices
+*>            STREVC3 computes the left and right eigenvector matrices
 *>            L and R for T.
 *>
 *>            SHSEIN computes the left and right eigenvector matrices
@@ -464,7 +464,7 @@
       EXTERNAL           SCOPY, SGEHRD, SGEMM, SGET10, SGET22, SHSEIN,
      $                   SHSEQR, SHST01, SLABAD, SLACPY, SLAFTS, SLASET,
      $                   SLASUM, SLATME, SLATMR, SLATMS, SORGHR, SORMHR,
-     $                   STREVC, XERBLA
+     $                   STREVC3, XERBLA
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, MAX, MIN, REAL, SQRT
@@ -875,10 +875,10 @@
             IF( J.GT.0 )
      $         GO TO 140
 *
-            CALL STREVC( 'Right', 'All', SELECT, N, T1, LDA, DUMMA, LDU,
-     $                   EVECTR, LDU, N, IN, WORK, IINFO )
+            CALL STREVC3( 'Right', 'All', SELECT, N, T1, LDA, DUMMA,
+     $                    LDU, EVECTR, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'STREVC(R,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'STREVC3(R,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250
@@ -890,17 +890,17 @@
      $                   WI1, WORK, DUMMA( 1 ) )
             RESULT( 9 ) = DUMMA( 1 )
             IF( DUMMA( 2 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Right', 'STREVC',
+               WRITE( NOUNIT, FMT = 9998 )'Right', 'STREVC3',
      $            DUMMA( 2 ), N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected right eigenvectors and confirm that
 *           they agree with previous right eigenvectors
 *
-            CALL STREVC( 'Right', 'Some', SELECT, N, T1, LDA, DUMMA,
-     $                   LDU, EVECTL, LDU, N, IN, WORK, IINFO )
+            CALL STREVC3( 'Right', 'Some', SELECT, N, T1, LDA, DUMMA,
+     $                    LDU, EVECTL, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'STREVC(R,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'STREVC3(R,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250
@@ -911,7 +911,8 @@
             DO 170 J = 1, N
                IF( SELECT( J ) .AND. WI1( J ).EQ.ZERO ) THEN
                   DO 150 JJ = 1, N
-                     IF( EVECTR( JJ, J ).NE.EVECTL( JJ, K ) ) THEN
+                     TEMP1 = ABS( EVECTR( JJ, J ) - EVECTL( JJ, K ) )
+                     IF( TEMP1 * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 180
                      END IF
@@ -919,8 +920,11 @@
                   K = K + 1
                ELSE IF( SELECT( J ) .AND. WI1( J ).NE.ZERO ) THEN
                   DO 160 JJ = 1, N
-                     IF( EVECTR( JJ, J ).NE.EVECTL( JJ, K ) .OR.
-     $                   EVECTR( JJ, J+1 ).NE.EVECTL( JJ, K+1 ) ) THEN
+                     TEMP1 = ABS( EVECTR( JJ, J ) - EVECTL( JJ, K ) )
+                     TEMP2 = ABS( EVECTR( JJ, J+1 )
+     $                            - EVECTL( JJ, K+1 ) )
+                     IF( TEMP1 * ULPINV.GT.THRESH
+     $                   .OR. TEMP2 * ULPINV.GT.THRESH ) THEN
                         MATCH = .FALSE.
                         GO TO 180
                      END IF
@@ -930,17 +934,17 @@
   170       CONTINUE
   180       CONTINUE
             IF( .NOT.MATCH )
-     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'STREVC', N, JTYPE,
+     $         WRITE( NOUNIT, FMT = 9997 )'Right', 'STREVC3', N, JTYPE,
      $         IOLDSD
 *
 *           Compute the Left eigenvector Matrix:
 *
             NTEST = 10
             RESULT( 10 ) = ULPINV
-            CALL STREVC( 'Left', 'All', SELECT, N, T1, LDA, EVECTL, LDU,
-     $                   DUMMA, LDU, N, IN, WORK, IINFO )
+            CALL STREVC3( 'Left', 'All', SELECT, N, T1, LDA, EVECTL,
+     $                    LDU, DUMMA, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'STREVC(L,A)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'STREVC3(L,A)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250
@@ -952,17 +956,17 @@
      $                   WR1, WI1, WORK, DUMMA( 3 ) )
             RESULT( 10 ) = DUMMA( 3 )
             IF( DUMMA( 4 ).GT.THRESH ) THEN
-               WRITE( NOUNIT, FMT = 9998 )'Left', 'STREVC', DUMMA( 4 ),
+               WRITE( NOUNIT, FMT = 9998 )'Left', 'STREVC3', DUMMA( 4 ),
      $            N, JTYPE, IOLDSD
             END IF
 *
 *           Compute selected left eigenvectors and confirm that
 *           they agree with previous left eigenvectors
 *
-            CALL STREVC( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
-     $                   LDU, DUMMA, LDU, N, IN, WORK, IINFO )
+            CALL STREVC3( 'Left', 'Some', SELECT, N, T1, LDA, EVECTR,
+     $                    LDU, DUMMA, LDU, N, IN, WORK, NWORK, IINFO )
             IF( IINFO.NE.0 ) THEN
-               WRITE( NOUNIT, FMT = 9999 )'STREVC(L,S)', IINFO, N,
+               WRITE( NOUNIT, FMT = 9999 )'STREVC3(L,S)', IINFO, N,
      $            JTYPE, IOLDSD
                INFO = ABS( IINFO )
                GO TO 250

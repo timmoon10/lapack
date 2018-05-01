@@ -439,7 +439,7 @@
       IF( WANTVL .OR. WANTVR ) THEN
 *
 *        Compute left and/or right eigenvectors
-*        (Workspace: need 4*N, prefer N + N + 2*N*NB)
+*        (Workspace: need 3*N, prefer 2*N*NB)
 *
          CALL STREVC3( SIDE, 'B', SELECT, N, A, LDA, VL, LDVL, VR, LDVR,
      $                 N, NOUT, WORK( IWRK ), LWORK-IWRK+1, IERR )

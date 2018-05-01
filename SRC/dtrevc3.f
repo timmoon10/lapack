@@ -281,7 +281,8 @@
       EXTERNAL           LSAME, ILAENV, DLAMCH, DASUM
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           XERBLA, DLABAD, DAXPY, DSCAL, DGEMM, DLALN2
+      EXTERNAL           XERBLA, DLABAD, DAXPY, DSCAL, DGEMV, DGEMM,
+     $                   DLALN2
 *     ..
 *     .. Intrinsic Functions ..
       INTRINSIC          ABS, DBLE, DCMPLX, AIMAG, MIN, MAX, MAXVAL

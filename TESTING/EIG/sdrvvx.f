@@ -85,13 +85,13 @@
 *>      eigenvalues computed when only some of VR, VL, RCONDV, and
 *>      RCONDE are computed.
 *>
-*>    (6)     VR(full) = VR(partial)
+*>    (6)     | VR(full) - VR(partial) | / ulp
 *>
 *>      VR(full) denotes the right eigenvectors computed when VL, RCONDV
 *>      and RCONDE are computed, and VR(partial) denotes the result
 *>      when only some of VL and RCONDV are computed.
 *>
-*>    (7)     VL(full) = VL(partial)
+*>    (7)     | VL(full) - VL(partial) | / ulp
 *>
 *>      VL(full) denotes the left eigenvectors computed when VR, RCONDV
 *>      and RCONDE are computed, and VL(partial) denotes the result
@@ -995,10 +995,8 @@
      $      / ' 4 = | |VL(i)| - 1 | / ulp ',
      $      / ' 5 = 0 if W same no matter if VR or VL computed,',
      $      ' 1/ulp otherwise', /
-     $      ' 6 = 0 if VR same no matter what else computed,',
-     $      '  1/ulp otherwise', /
-     $      ' 7 = 0 if VL same no matter what else computed,',
-     $      '  1/ulp otherwise', /
+     $      ' 6 = | VR(full) - VR(partial) | / ulp', /
+     $      ' 7 = | VL(full) - VL(partial) | / ulp', /
      $      ' 8 = 0 if RCONDV same no matter what else computed,',
      $      '  1/ulp otherwise', /
      $      ' 9 = 0 if SCALE, ILO, IHI, ABNRM same no matter what else',

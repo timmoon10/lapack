@@ -18,8 +18,8 @@
 *  Definition:
 *  ===========
 *
-*       SUBROUTINE STREVC3( SIDE, HOWMNY, SELECT, N, T, LDT, VL, LDVL,
-*                           VR, LDVR, MM, M, WORK, LWORK, INFO )
+*       SUBROUTINE STREVC3( SIDE, HOWMNY, SELECT, N, T, LDT,
+*      $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO)
 *
 *       .. Scalar Arguments ..
 *       CHARACTER          HOWMNY, SIDE
@@ -27,7 +27,7 @@
 *       ..
 *       .. Array Arguments ..
 *       LOGICAL            SELECT( * )
-*       REAL   T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
+*       REAL               T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
 *      $                   WORK( * )
 *       ..
 *
@@ -45,9 +45,9 @@
 *> The right eigenvector x and the left eigenvector y of T corresponding
 *> to an eigenvalue w are defined by:
 *>
-*>    T*x = w*x,     (y**H)*T = w*(y**H)
+*>              T*x = w*x,     (y**H)*T = w*(y**H)
 *>
-*> where y**H denotes the conjugate transpose of y.
+*> where y**H denotes the conjugate transpose of the vector y.
 *> The eigenvalues are not input to this routine, but are read directly
 *> from the diagonal blocks of T.
 *>
@@ -57,7 +57,7 @@
 *> A to Schur form T, then Q*X and Q*Y are the matrices of right and
 *> left eigenvectors of A.
 *>
-*> This uses a Level 3 BLAS version of the back transformation.
+*> This uses a blocked version of the algorithm.
 *> \endverbatim
 *
 *  Arguments:
@@ -76,23 +76,19 @@
 *>          HOWMNY is CHARACTER*1
 *>          = 'A':  compute all right and/or left eigenvectors;
 *>          = 'B':  compute all right and/or left eigenvectors,
-*>                  backtransformed by the matrices in VR and/or VL;
+*>                  backtransformed using the matrices supplied in
+*>                  VR and/or VL;
 *>          = 'S':  compute selected right and/or left eigenvectors,
 *>                  as indicated by the logical array SELECT.
 *> \endverbatim
 *>
-*> \param[in,out] SELECT
+*> \param[in] SELECT
 *> \verbatim
 *>          SELECT is LOGICAL array, dimension (N)
 *>          If HOWMNY = 'S', SELECT specifies the eigenvectors to be
 *>          computed.
-*>          If w(j) is a real eigenvalue, the corresponding real
-*>          eigenvector is computed if SELECT(j) is .TRUE..
-*>          If w(j) and w(j+1) are the real and imaginary parts of a
-*>          complex eigenvalue, the corresponding complex eigenvector is
-*>          computed if either SELECT(j) or SELECT(j+1) is .TRUE., and
-*>          on exit SELECT(j) is set to .TRUE. and SELECT(j+1) is set to
-*>          .FALSE..
+*>          The eigenvector corresponding to the j-th eigenvalue is
+*>          computed if SELECT(j) = .TRUE..
 *>          Not referenced if HOWMNY = 'A' or 'B'.
 *> \endverbatim
 *>
@@ -102,7 +98,7 @@
 *>          The order of the matrix T. N >= 0.
 *> \endverbatim
 *>
-*> \param[in] T
+*> \param[in,out] T
 *> \verbatim
 *>          T is REAL array, dimension (LDT,N)
 *>          The upper quasi-triangular matrix T in Schur canonical form.
@@ -178,20 +174,19 @@
 *>          The number of columns in the arrays VL and/or VR actually
 *>          used to store the eigenvectors.
 *>          If HOWMNY = 'A' or 'B', M is set to N.
-*>          Each selected real eigenvector occupies one column and each
-*>          selected complex eigenvector occupies two columns.
+*>          Each selected eigenvector occupies one column.
 *> \endverbatim
 *>
 *> \param[out] WORK
 *> \verbatim
-*>          WORK is REAL array, dimension (MAX(1,LWORK))
+*>          WORK is REAL array, dimension (LWORK)
 *> \endverbatim
 *>
 *> \param[in] LWORK
 *> \verbatim
 *>          LWORK is INTEGER
 *>          The dimension of array WORK. LWORK >= max(1,3*N).
-*>          For optimum performance, LWORK >= N + 2*N*NB, where NB is
+*>          For optimum performance, LWORK >= 2*N*NB, where NB is
 *>          the optimal blocksize.
 *>
 *>          If LWORK = -1, then a workspace query is assumed; the routine
@@ -217,8 +212,6 @@
 *
 *> \date November 2017
 *
-*  @generated from dtrevc3.f, fortran d -> s, Tue Apr 19 01:47:44 2016
-*
 *> \ingroup realOTHERcomputational
 *
 *> \par Further Details:
@@ -226,9 +219,9 @@
 *>
 *> \verbatim
 *>
-*>  The algorithm used in this program is basically backward (forward)
-*>  substitution, with scaling to make the the code robust against
-*>  possible overflow.
+*>  The algorithm used in this program is basically blocked backward
+*>  (forward) substitution, with scaling to make the the code robust
+*>  against possible overflow.
 *>
 *>  Each eigenvector is normalized so that the element of largest
 *>  magnitude has magnitude 1; here the magnitude of a complex number
@@ -236,8 +229,8 @@
 *> \endverbatim
 *>
 *  =====================================================================
-      SUBROUTINE STREVC3( SIDE, HOWMNY, SELECT, N, T, LDT, VL, LDVL,
-     $                    VR, LDVR, MM, M, WORK, LWORK, INFO )
+      SUBROUTINE STREVC3( SIDE, HOWMNY, SELECT, N, T, LDT,
+     $                    VL, LDVL, VR, LDVR, MM, M, WORK, LWORK, INFO )
       IMPLICIT NONE
 *
 *  -- LAPACK computational routine (version 3.8.0) --
@@ -251,64 +244,101 @@
 *     ..
 *     .. Array Arguments ..
       LOGICAL            SELECT( * )
-      REAL   T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
-     $                   WORK( * )
+      REAL               T( LDT, * ), VL( LDVL, * ), VR( LDVR, * ),
+     $                   WORK( N, * )
 *     ..
 *
 *  =====================================================================
 *
 *     .. Parameters ..
-      REAL   ZERO, ONE
-      PARAMETER          ( ZERO = 0.0E+0, ONE = 1.0E+0 )
-      INTEGER            NBMIN, NBMAX
-      PARAMETER          ( NBMIN = 8, NBMAX = 128 )
+      REAL               ZERO, ONE, NEGONE, HALF
+      PARAMETER          ( ZERO = 0.0E+0, ONE = 1.0E+0,
+     $                     NEGONE = -1.0E+0, HALF = 5.0E-1 )
+      INTEGER            NBMAX, MBMAX
+      PARAMETER          ( NBMAX = 64, MBMAX = 64 )
 *     ..
 *     .. Local Scalars ..
-      LOGICAL            ALLV, BOTHV, LEFTV, LQUERY, OVER, PAIR,
-     $                   RIGHTV, SOMEV
-      INTEGER            I, IERR, II, IP, IS, J, J1, J2, JNXT, K, KI,
-     $                   IV, MAXWRK, NB, KI2
-      REAL   BETA, BIGNUM, EMAX, OVFL, REC, REMAX, SCALE,
-     $                   SMIN, SMLNUM, ULP, UNFL, VCRIT, VMAX, WI, WR,
-     $                   XNORM
+      LOGICAL            LEFTV, RIGHTV, BACKTRANSFORM, SOMEV, SELECTV
+      REAL               UNFL, OVFL, ULP, SMLNUM, BOUND, SCALE, SMIN,
+     $                   XNORM, CNORM, TOFFNORM, TEMP
+      COMPLEX            SHIFT, CTEMP
+      INTEGER            I, IB, IBEND, IMIN, IMAX,
+     $                   J, JV, JB, JBEND, JOUT, JMAX, K,
+     $                   NB, MB, DSIZE, IERR
+*     ..
+*     .. Local Arrays ..
+      INTEGER            JLIST( MBMAX ), VDSIZES( MBMAX ),
+     $                   TDSIZES( NBMAX )
+      REAL               CNORMS( NBMAX ), VBOUNDS( MBMAX ),
+     $                   VDIAGS( MBMAX, 2 ), VDIAG( 2, 2 ),
+     $                   D( 2, 2 ), B( 2, 2 ), X( 2, 2 )
+      COMPLEX            SHIFTS( MBMAX )
 *     ..
 *     .. External Functions ..
       LOGICAL            LSAME
-      INTEGER            ISAMAX, ILAENV
-      REAL   SDOT, SLAMCH
-      EXTERNAL           LSAME, ISAMAX, ILAENV, SDOT, SLAMCH
+      INTEGER            ILAENV
+      REAL               SLAMCH, SASUM
+      EXTERNAL           LSAME, ILAENV, SLAMCH, SASUM
 *     ..
 *     .. External Subroutines ..
-      EXTERNAL           SAXPY, SCOPY, SGEMV, SLALN2, SSCAL, XERBLA,
-     $                   SLACPY, SGEMM, SLABAD, SLASET
+      EXTERNAL           XERBLA, SLABAD, SAXPY, SSCAL, SGEMV, SGEMM,
+     $                   SLALN2
 *     ..
 *     .. Intrinsic Functions ..
-      INTRINSIC          ABS, MAX, SQRT
+      INTRINSIC          ABS, REAL, CMPLX, AIMAG, MIN, MAX, MAXVAL
 *     ..
-*     .. Local Arrays ..
-      REAL   X( 2, 2 )
-      INTEGER            ISCOMPLEX( NBMAX )
+*     .. Statement Functions ..
+      REAL               SQ, CABS1
+*     ..
+*     .. Statement Function definitions ..
+      SQ( TEMP ) = TEMP * TEMP
+      CABS1( CTEMP ) = ABS( REAL( CTEMP ) ) + ABS( AIMAG( CTEMP ) )
 *     ..
 *     .. Executable Statements ..
 *
 *     Decode and test the input parameters
 *
-      BOTHV  = LSAME( SIDE, 'B' )
-      RIGHTV = LSAME( SIDE, 'R' ) .OR. BOTHV
-      LEFTV  = LSAME( SIDE, 'L' ) .OR. BOTHV
-*
-      ALLV  = LSAME( HOWMNY, 'A' )
-      OVER  = LSAME( HOWMNY, 'B' )
+      RIGHTV = LSAME( SIDE, 'R' ) .OR. LSAME( SIDE, 'B' )
+      LEFTV = LSAME( SIDE, 'L' ) .OR. LSAME( SIDE, 'B' )
+      BACKTRANSFORM = LSAME( HOWMNY, 'B' )
       SOMEV = LSAME( HOWMNY, 'S' )
 *
+*     Set M to the number of columns required to store the selected
+*     eigenvectors and standardize the array SELECT if necessary.
+*
+      IF( SOMEV ) THEN
+         M = 0
+         J = 1
+         DO WHILE( J.LT.N )
+            IF( T( J+1, J ).EQ.ZERO ) THEN
+               IF( SELECT( J ) )
+     $              M = M + 1
+               J = J + 1
+            ELSE
+               IF( SELECT( J ).OR.SELECT( J+1 ) ) THEN
+                  M = M + 2
+                  SELECT( J ) = .TRUE.
+                  SELECT( J+1 ) = .FALSE.
+               END IF
+               J = J + 2
+            END IF
+         END DO
+         IF( J.EQ.N ) THEN
+            IF( SELECT( J ) )
+     $           M = M + 1
+         END IF
+      ELSE
+         M = N
+      END IF
+*
       INFO = 0
-      NB = ILAENV( 1, 'STREVC', SIDE // HOWMNY, N, -1, -1, -1 )
-      MAXWRK = N + 2*N*NB
-      WORK(1) = MAXWRK
-      LQUERY = ( LWORK.EQ.-1 )
+      MB = ILAENV( 1, 'STREVC', SIDE // HOWMNY, N, -1, -1, -1 )
+      WORK( 1, 1 ) = 2 * N * MB
       IF( .NOT.RIGHTV .AND. .NOT.LEFTV ) THEN
          INFO = -1
-      ELSE IF( .NOT.ALLV .AND. .NOT.OVER .AND. .NOT.SOMEV ) THEN
+      ELSE IF( .NOT.LSAME( HOWMNY, 'A' )
+     $         .AND. .NOT.BACKTRANSFORM
+     $         .AND. .NOT.SOMEV ) THEN
          INFO = -2
       ELSE IF( N.LT.0 ) THEN
          INFO = -4
@@ -318,51 +348,15 @@
          INFO = -8
       ELSE IF( LDVR.LT.1 .OR. ( RIGHTV .AND. LDVR.LT.N ) ) THEN
          INFO = -10
-      ELSE IF( LWORK.LT.MAX( 1, 3*N ) .AND. .NOT.LQUERY ) THEN
+      ELSE IF( MM.LT.M ) THEN
+         INFO = -11
+      ELSE IF( LWORK.NE.-1 .AND. LWORK.LT.MAX( 1, 3*N ) ) THEN
          INFO = -14
-      ELSE
-*
-*        Set M to the number of columns required to store the selected
-*        eigenvectors, standardize the array SELECT if necessary, and
-*        test MM.
-*
-         IF( SOMEV ) THEN
-            M = 0
-            PAIR = .FALSE.
-            DO 10 J = 1, N
-               IF( PAIR ) THEN
-                  PAIR = .FALSE.
-                  SELECT( J ) = .FALSE.
-               ELSE
-                  IF( J.LT.N ) THEN
-                     IF( T( J+1, J ).EQ.ZERO ) THEN
-                        IF( SELECT( J ) )
-     $                     M = M + 1
-                     ELSE
-                        PAIR = .TRUE.
-                        IF( SELECT( J ) .OR. SELECT( J+1 ) ) THEN
-                           SELECT( J ) = .TRUE.
-                           M = M + 2
-                        END IF
-                     END IF
-                  ELSE
-                     IF( SELECT( N ) )
-     $                  M = M + 1
-                  END IF
-               END IF
-   10       CONTINUE
-         ELSE
-            M = N
-         END IF
-*
-         IF( MM.LT.M ) THEN
-            INFO = -11
-         END IF
       END IF
       IF( INFO.NE.0 ) THEN
          CALL XERBLA( 'STREVC3', -INFO )
          RETURN
-      ELSE IF( LQUERY ) THEN
+      ELSE IF( LWORK.EQ.-1 ) THEN
          RETURN
       END IF
 *
@@ -371,15 +365,16 @@
       IF( N.EQ.0 )
      $   RETURN
 *
-*     Use blocked version of back-transformation if sufficient workspace.
-*     Zero-out the workspace to avoid potential NaN propagation.
+*     Determine block size
 *
-      IF( OVER .AND. LWORK .GE. N + 2*N*NBMIN ) THEN
-         NB = (LWORK - N) / (2*N)
-         NB = MIN( NB, NBMAX )
-         CALL SLASET( 'F', N, 1+2*NB, ZERO, ZERO, WORK, N )
+      IF( BACKTRANSFORM ) THEN
+         IF( LWORK .GE. 4*N ) THEN
+            JMAX = MIN( LWORK / (2*N), MBMAX )
+         ELSE
+            JMAX = 2
+         END IF
       ELSE
-         NB = 1
+         JMAX = MIN( LWORK / N, MBMAX )
       END IF
 *
 *     Set the constants to control overflow.
@@ -389,914 +384,1052 @@
       CALL SLABAD( UNFL, OVFL )
       ULP = SLAMCH( 'Precision' )
       SMLNUM = UNFL*( N / ULP )
-      BIGNUM = ( ONE-ULP ) / SMLNUM
+
 *
-*     Compute 1-norm of each column of strictly upper triangular
-*     part of T to control overflow in triangular solver.
-*
-      WORK( 1 ) = ZERO
-      DO 30 J = 2, N
-         WORK( J ) = ZERO
-         DO 20 I = 1, J - 1
-            WORK( J ) = WORK( J ) + ABS( T( I, J ) )
-   20    CONTINUE
-   30 CONTINUE
-*
-*     Index IP is used to specify the real or complex eigenvalue:
-*       IP = 0, real eigenvalue,
-*            1, first  of conjugate complex pair: (wr,wi)
-*           -1, second of conjugate complex pair: (wr,wi)
-*       ISCOMPLEX array stores IP for each column in current block.
+*     --------------------------------------------------------------
+*     Compute right eigenvectors.
 *
       IF( RIGHTV ) THEN
+         IMIN = 1
+         IMAX = 0
+         JB = JMAX + 1
+         JBEND = JMAX
+         JOUT = M + 1
+         JLIST = 0
+         DO JV = N, 1, -1
 *
-*        ============================================================
-*        Compute right eigenvectors.
+*           --------------------------------------------------------
+*           Add current eigenvector to workspace if needed.
 *
-*        IV is index of column in current block.
-*        For complex right vector, uses IV-1 for real part and IV for complex part.
-*        Non-blocked version always uses IV=2;
-*        blocked     version starts with IV=NB, goes down to 1 or 2.
-*        (Note the "0-th" column is used for 1-norms computed above.)
-         IV = 2
-         IF( NB.GT.2 ) THEN
-            IV = NB
-         END IF
-
-         IP = 0
-         IS = M
-         DO 140 KI = N, 1, -1
-            IF( IP.EQ.-1 ) THEN
-*              previous iteration (ki+1) was second of conjugate pair,
-*              so this ki is first of conjugate pair; skip to end of loop
-               IP = 1
-               GO TO 140
-            ELSE IF( KI.EQ.1 ) THEN
-*              last column, so this ki must be real eigenvalue
-               IP = 0
-            ELSE IF( T( KI, KI-1 ).EQ.ZERO ) THEN
-*              zero on sub-diagonal, so this ki is real eigenvalue
-               IP = 0
-            ELSE
-*              non-zero on sub-diagonal, so this ki is second of conjugate pair
-               IP = -1
+            DSIZE = 1
+            IF( JV.LT.N ) THEN
+               IF( T( JV+1, JV ).NE.ZERO )
+     $              DSIZE = 2
             END IF
-
+            IF( JV.GT.1 ) THEN
+               IF( T( JV, JV-1 ).NE.ZERO )
+     $              DSIZE = 0
+            END IF
+            SELECTV = DSIZE.NE.0
             IF( SOMEV ) THEN
-               IF( IP.EQ.0 ) THEN
-                  IF( .NOT.SELECT( KI ) )
-     $               GO TO 140
-               ELSE
-                  IF( .NOT.SELECT( KI-1 ) )
-     $               GO TO 140
-               END IF
+               SELECTV = SELECTV .AND. SELECT( JV )
+            ENDIF
+            IF( SELECTV ) THEN
+               IMAX = MAX( IMAX, JV + DSIZE - 1 )
+               JB = JB - DSIZE
+               JLIST( JB ) = JV
+               VDSIZES( JB ) = DSIZE
+               SELECT CASE( DSIZE )               
+               CASE( 1 )
+*
+*                 --------------------------------------------------
+*                 Add real eigenvector to workspace.
+*
+                  SHIFT = CMPLX( T( JV, JV ) )
+                  X( 1, 1 ) = ONE
+                  WORK( IMIN : JV - 1, JB ) = -T( IMIN : JV - 1, JV )
+                  WORK( JV : IMAX, JB ) = ZERO
+                  BOUND = SASUM( JV - IMIN, WORK( IMIN, JB ), 1 )
+                  IF( BOUND.GE.OVFL ) THEN
+                     SCALE = HALF * OVFL / BOUND
+                     X( 1, 1 ) = SCALE * X( 1, 1 )
+                     BOUND = HALF * OVFL
+                     CALL SSCAL( JV - IMIN, SCALE, WORK( IMIN, JB ), 1 )
+                  END IF
+                  SHIFTS( JB ) = SHIFT
+                  VDIAGS( JB , 1 ) = X( 1, 1 )
+                  VBOUNDS( JB ) = BOUND
+               CASE( 2 )
+*     
+*                 --------------------------------------------------
+*                 Add complex eigenvector to workspace.
+*
+                  JLIST( JB+1 ) = 0
+                  VDSIZES( JB+1 ) = 0
+*
+*                 Compute eigenvalues of 2x2 diagonal block
+*                 Note: We assume 2x2 diagonal blocks of Schur matrices
+*                 have complex eigenvalues/eigenvectors. SHSEQR
+*                 guarantees that these blocks satisfy D(1,1)=D(2,2) and
+*                 D(2,1)*D(1,2)<0, so we don't worry too much about
+*                 numerical nastiness.
+*
+                  D = T( JV : JV+1, JV : JV+1 )
+                  SHIFT = CMPLX( HALF * ( D(1,1) + D(2,2) ) )
+                  IF( D(1,1) .NE. D(2,2)
+     $                .OR. D(2,1) * D(1,2) .GT. ZERO ) THEN
+                     TEMP = -D(1,2) * D(2,1) - SQ( D(1,1) - D(2,2) ) / 4
+                     TEMP = SQRT( MAX( TEMP, SMLNUM ) )
+                  ELSE IF( D(2,1) .LT. ZERO ) THEN
+                     TEMP = SQRT( -D(2,1) ) * SQRT( D(1,2) )
+                  ELSE
+                     TEMP = SQRT( D(2,1) ) * SQRT( -D(1,2) )
+                  END IF
+                  SHIFT = SHIFT + CMPLX( ZERO, TEMP )
+*
+*                 Compute eigenvectors of 2x2 diagonal block
+*                 Note: We apply a safe solve against a vector
+*                 orthogonal to the range of D-SHIFT*I.
+*     
+                  SMIN = MAX( ULP * CABS1( SHIFT ), SMLNUM )
+                  B( 1, 1 ) = -D( 2, 1 )
+                  B( 2, 1 ) = D( 1, 1 ) - REAL( SHIFT )
+                  B( 1, 2 ) = ZERO
+                  B( 2, 2 ) = AIMAG( SHIFT )
+                  B = B / SUM( ABS( B ) )
+                  CALL SLALN2( .FALSE., 2, 2, SMIN,
+     $                         ONE, D, 2, ONE, ONE, B, 2,
+     $                         REAL( SHIFT ), AIMAG( SHIFT ), X, 2,
+     $                         SCALE, XNORM, IERR )
+                  X = X / XNORM
+*
+*                 Populate workspace and scale if needed
+*                 
+                  CALL SGEMM( 'N', 'N', JV - IMIN, 2, 2,
+     $                        -ONE, T( IMIN, JV ), LDT, X, 2,
+     $                        ZERO, WORK( IMIN, JB ), N )
+                  WORK( JV : IMAX, JB : JB+1 ) = ZERO
+                  BOUND = SASUM( JV - IMIN, WORK( IMIN, JB ), 1 )
+     $                    + SASUM( JV - IMIN, WORK( IMIN, JB+1 ), 1 )
+                  IF( BOUND.GE.OVFL ) THEN
+                     SCALE = HALF * OVFL / BOUND
+                     X = SCALE * X
+                     BOUND = HALF * OVFL
+                     CALL SSCAL( JV - IMIN, SCALE,
+     $                           WORK( IMIN, JB ), 1 )
+                     CALL SSCAL( JV - IMIN, SCALE,
+     $                           WORK( IMIN, JB+1 ), 1 )
+                  END IF
+                  SHIFTS( JB ) = SHIFT
+                  SHIFTS( JB+1 ) = CMPLX( ZERO, ZERO )
+                  VDIAGS( JB:JB+1 , : ) = X
+                  VBOUNDS( JB ) = BOUND
+                  VBOUNDS( JB+1 ) = ZERO
+               END SELECT
             END IF
 *
-*           Compute the KI-th eigenvalue (WR,WI).
+*           --------------------------------------------------------
+*           Process workspace if full or if all eigenvectors are
+*           found.
 *
-            WR = T( KI, KI )
-            WI = ZERO
-            IF( IP.NE.0 )
-     $         WI = SQRT( ABS( T( KI, KI-1 ) ) )*
-     $              SQRT( ABS( T( KI-1, KI ) ) )
-            SMIN = MAX( ULP*( ABS( WR )+ABS( WI ) ), SMLNUM )
+            IF( JB.LE.2 .OR. ( JV.EQ.1 .AND. JB.LE.JBEND ) ) THEN
+               MB = JBEND - JB + 1
 *
-            IF( IP.EQ.0 ) THEN
-*
-*              --------------------------------------------------------
-*              Real right eigenvector
-*
-               WORK( KI + IV*N ) = ONE
-*
-*              Form right-hand side.
-*
-               DO 50 K = 1, KI - 1
-                  WORK( K + IV*N ) = -T( K, KI )
-   50          CONTINUE
-*
-*              Solve upper quasi-triangular system:
-*              [ T(1:KI-1,1:KI-1) - WR ]*X = SCALE*WORK.
-*
-               JNXT = KI - 1
-               DO 60 J = KI - 1, 1, -1
-                  IF( J.GT.JNXT )
-     $               GO TO 60
-                  J1 = J
-                  J2 = J
-                  JNXT = J - 1
-                  IF( J.GT.1 ) THEN
-                     IF( T( J, J-1 ).NE.ZERO ) THEN
-                        J1   = J - 1
-                        JNXT = J - 2
-                     END IF
+*              Blocked back substitution.
+*              Note: We avoid splitting up 2x2 blocks.
+*               
+               IBEND = IMAX
+               DO WHILE( IBEND.GT.0 )
+                  IB = MAX( IBEND - NBMAX + 1, IMIN )
+                  IF( IB.GT.1 ) THEN
+                     IF( T( IB, IB-1 ).NE.ZERO )
+     $                    IB = IB + 1
                   END IF
 *
-                  IF( J1.EQ.J2 ) THEN
-*
-*                    1-by-1 diagonal block
-*
-                     CALL SLALN2( .FALSE., 1, 1, SMIN, ONE, T( J, J ),
-     $                            LDT, ONE, ONE, WORK( J+IV*N ), N, WR,
-     $                            ZERO, X, 2, SCALE, XNORM, IERR )
-*
-*                    Scale X(1,1) to avoid overflow when updating
-*                    the right-hand side.
-*
-                     IF( XNORM.GT.ONE ) THEN
-                        IF( WORK( J ).GT.BIGNUM / XNORM ) THEN
-                           X( 1, 1 ) = X( 1, 1 ) / XNORM
-                           SCALE = SCALE / XNORM
-                        END IF
+*                 Analyze diagonal block.
+*                 Note: We determine whether each diagonal entry belongs
+*                 to a 2x2 block, compute the 1-norms of the
+*                 off-diagonal columns, and compute the entry-wise
+*                 1-norm.
+*     
+                  DO I = IB, IBEND
+                     DSIZE = 1
+                     IF( I.LT.IBEND ) THEN
+                        IF( T( I+1, I ).NE.ZERO )
+     $                       DSIZE = 2
                      END IF
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE )
-     $                  CALL SSCAL( KI, SCALE, WORK( 1+IV*N ), 1 )
-                     WORK( J+IV*N ) = X( 1, 1 )
-*
-*                    Update right-hand side
-*
-                     CALL SAXPY( J-1, -X( 1, 1 ), T( 1, J ), 1,
-     $                           WORK( 1+IV*N ), 1 )
-*
-                  ELSE
-*
-*                    2-by-2 diagonal block
-*
-                     CALL SLALN2( .FALSE., 2, 1, SMIN, ONE,
-     $                            T( J-1, J-1 ), LDT, ONE, ONE,
-     $                            WORK( J-1+IV*N ), N, WR, ZERO, X, 2,
-     $                            SCALE, XNORM, IERR )
-*
-*                    Scale X(1,1) and X(2,1) to avoid overflow when
-*                    updating the right-hand side.
-*
-                     IF( XNORM.GT.ONE ) THEN
-                        BETA = MAX( WORK( J-1 ), WORK( J ) )
-                        IF( BETA.GT.BIGNUM / XNORM ) THEN
-                           X( 1, 1 ) = X( 1, 1 ) / XNORM
-                           X( 2, 1 ) = X( 2, 1 ) / XNORM
-                           SCALE = SCALE / XNORM
-                        END IF
+                     IF( I.GT.IB ) THEN
+                        IF( T( I, I-1 ).NE.ZERO )
+     $                       DSIZE = 0
                      END IF
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE )
-     $                  CALL SSCAL( KI, SCALE, WORK( 1+IV*N ), 1 )
-                     WORK( J-1+IV*N ) = X( 1, 1 )
-                     WORK( J  +IV*N ) = X( 2, 1 )
-*
-*                    Update right-hand side
-*
-                     CALL SAXPY( J-2, -X( 1, 1 ), T( 1, J-1 ), 1,
-     $                           WORK( 1+IV*N ), 1 )
-                     CALL SAXPY( J-2, -X( 2, 1 ), T( 1, J ), 1,
-     $                           WORK( 1+IV*N ), 1 )
-                  END IF
-   60          CONTINUE
-*
-*              Copy the vector x or Q*x to VR and normalize.
-*
-               IF( .NOT.OVER ) THEN
-*                 ------------------------------
-*                 no back-transform: copy x to VR and normalize.
-                  CALL SCOPY( KI, WORK( 1 + IV*N ), 1, VR( 1, IS ), 1 )
-*
-                  II = ISAMAX( KI, VR( 1, IS ), 1 )
-                  REMAX = ONE / ABS( VR( II, IS ) )
-                  CALL SSCAL( KI, REMAX, VR( 1, IS ), 1 )
-*
-                  DO 70 K = KI + 1, N
-                     VR( K, IS ) = ZERO
-   70             CONTINUE
-*
-               ELSE IF( NB.EQ.1 ) THEN
-*                 ------------------------------
-*                 version 1: back-transform each vector with GEMV, Q*x.
-                  IF( KI.GT.1 )
-     $               CALL SGEMV( 'N', N, KI-1, ONE, VR, LDVR,
-     $                           WORK( 1 + IV*N ), 1, WORK( KI + IV*N ),
-     $                           VR( 1, KI ), 1 )
-*
-                  II = ISAMAX( N, VR( 1, KI ), 1 )
-                  REMAX = ONE / ABS( VR( II, KI ) )
-                  CALL SSCAL( N, REMAX, VR( 1, KI ), 1 )
-*
-               ELSE
-*                 ------------------------------
-*                 version 2: back-transform block of vectors with GEMM
-*                 zero out below vector
-                  DO K = KI + 1, N
-                     WORK( K + IV*N ) = ZERO
+                     SELECT CASE( DSIZE )
+                     CASE( 1 )
+                        BOUND = SASUM( I - IB, T( IB, I ), 1 )
+                     CASE( 2 )
+                        BOUND = SASUM( I - IB, T( IB, I ), 1 )
+     $                          + SASUM( I - IB, T( IB, I+1 ), 1 )
+                     CASE( 0 )
+                        BOUND = ZERO
+                     END SELECT
+                     TDSIZES( I - IB + 1 ) = DSIZE
+                     CNORMS( I - IB + 1 ) = BOUND
                   END DO
-                  ISCOMPLEX( IV ) = IP
-*                 back-transform and normalization is done below
-               END IF
-            ELSE
 *
-*              --------------------------------------------------------
-*              Complex right eigenvector.
-*
-*              Initial solve
-*              [ ( T(KI-1,KI-1) T(KI-1,KI) ) - (WR + I*WI) ]*X = 0.
-*              [ ( T(KI,  KI-1) T(KI,  KI) )               ]
-*
-               IF( ABS( T( KI-1, KI ) ).GE.ABS( T( KI, KI-1 ) ) ) THEN
-                  WORK( KI-1 + (IV-1)*N ) = ONE
-                  WORK( KI   + (IV  )*N ) = WI / T( KI-1, KI )
-               ELSE
-                  WORK( KI-1 + (IV-1)*N ) = -WI / T( KI, KI-1 )
-                  WORK( KI   + (IV  )*N ) = ONE
-               END IF
-               WORK( KI   + (IV-1)*N ) = ZERO
-               WORK( KI-1 + (IV  )*N ) = ZERO
-*
-*              Form right-hand side.
-*
-               DO 80 K = 1, KI - 2
-                  WORK( K+(IV-1)*N ) = -WORK( KI-1+(IV-1)*N )*T(K,KI-1)
-                  WORK( K+(IV  )*N ) = -WORK( KI  +(IV  )*N )*T(K,KI  )
-   80          CONTINUE
-*
-*              Solve upper quasi-triangular system:
-*              [ T(1:KI-2,1:KI-2) - (WR+i*WI) ]*X = SCALE*(WORK+i*WORK2)
-*
-               JNXT = KI - 2
-               DO 90 J = KI - 2, 1, -1
-                  IF( J.GT.JNXT )
-     $               GO TO 90
-                  J1 = J
-                  J2 = J
-                  JNXT = J - 1
-                  IF( J.GT.1 ) THEN
-                     IF( T( J, J-1 ).NE.ZERO ) THEN
-                        J1   = J - 1
-                        JNXT = J - 2
-                     END IF
-                  END IF
-*
-                  IF( J1.EQ.J2 ) THEN
-*
-*                    1-by-1 diagonal block
-*
-                     CALL SLALN2( .FALSE., 1, 2, SMIN, ONE, T( J, J ),
-     $                            LDT, ONE, ONE, WORK( J+(IV-1)*N ), N,
-     $                            WR, WI, X, 2, SCALE, XNORM, IERR )
-*
-*                    Scale X(1,1) and X(1,2) to avoid overflow when
-*                    updating the right-hand side.
-*
-                     IF( XNORM.GT.ONE ) THEN
-                        IF( WORK( J ).GT.BIGNUM / XNORM ) THEN
-                           X( 1, 1 ) = X( 1, 1 ) / XNORM
-                           X( 1, 2 ) = X( 1, 2 ) / XNORM
-                           SCALE = SCALE / XNORM
-                        END IF
-                     END IF
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE ) THEN
-                        CALL SSCAL( KI, SCALE, WORK( 1+(IV-1)*N ), 1 )
-                        CALL SSCAL( KI, SCALE, WORK( 1+(IV  )*N ), 1 )
-                     END IF
-                     WORK( J+(IV-1)*N ) = X( 1, 1 )
-                     WORK( J+(IV  )*N ) = X( 1, 2 )
-*
-*                    Update the right-hand side
-*
-                     CALL SAXPY( J-1, -X( 1, 1 ), T( 1, J ), 1,
-     $                           WORK( 1+(IV-1)*N ), 1 )
-                     CALL SAXPY( J-1, -X( 1, 2 ), T( 1, J ), 1,
-     $                           WORK( 1+(IV  )*N ), 1 )
-*
-                  ELSE
-*
-*                    2-by-2 diagonal block
-*
-                     CALL SLALN2( .FALSE., 2, 2, SMIN, ONE,
-     $                            T( J-1, J-1 ), LDT, ONE, ONE,
-     $                            WORK( J-1+(IV-1)*N ), N, WR, WI, X, 2,
-     $                            SCALE, XNORM, IERR )
-*
-*                    Scale X to avoid overflow when updating
-*                    the right-hand side.
-*
-                     IF( XNORM.GT.ONE ) THEN
-                        BETA = MAX( WORK( J-1 ), WORK( J ) )
-                        IF( BETA.GT.BIGNUM / XNORM ) THEN
-                           REC = ONE / XNORM
-                           X( 1, 1 ) = X( 1, 1 )*REC
-                           X( 1, 2 ) = X( 1, 2 )*REC
-                           X( 2, 1 ) = X( 2, 1 )*REC
-                           X( 2, 2 ) = X( 2, 2 )*REC
-                           SCALE = SCALE*REC
-                        END IF
-                     END IF
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE ) THEN
-                        CALL SSCAL( KI, SCALE, WORK( 1+(IV-1)*N ), 1 )
-                        CALL SSCAL( KI, SCALE, WORK( 1+(IV  )*N ), 1 )
-                     END IF
-                     WORK( J-1+(IV-1)*N ) = X( 1, 1 )
-                     WORK( J  +(IV-1)*N ) = X( 2, 1 )
-                     WORK( J-1+(IV  )*N ) = X( 1, 2 )
-                     WORK( J  +(IV  )*N ) = X( 2, 2 )
-*
-*                    Update the right-hand side
-*
-                     CALL SAXPY( J-2, -X( 1, 1 ), T( 1, J-1 ), 1,
-     $                           WORK( 1+(IV-1)*N   ), 1 )
-                     CALL SAXPY( J-2, -X( 2, 1 ), T( 1, J ), 1,
-     $                           WORK( 1+(IV-1)*N   ), 1 )
-                     CALL SAXPY( J-2, -X( 1, 2 ), T( 1, J-1 ), 1,
-     $                           WORK( 1+(IV  )*N ), 1 )
-                     CALL SAXPY( J-2, -X( 2, 2 ), T( 1, J ), 1,
-     $                           WORK( 1+(IV  )*N ), 1 )
-                  END IF
-   90          CONTINUE
-*
-*              Copy the vector x or Q*x to VR and normalize.
-*
-               IF( .NOT.OVER ) THEN
-*                 ------------------------------
-*                 no back-transform: copy x to VR and normalize.
-                  CALL SCOPY( KI, WORK( 1+(IV-1)*N ), 1, VR(1,IS-1), 1 )
-                  CALL SCOPY( KI, WORK( 1+(IV  )*N ), 1, VR(1,IS  ), 1 )
-*
-                  EMAX = ZERO
-                  DO 100 K = 1, KI
-                     EMAX = MAX( EMAX, ABS( VR( K, IS-1 ) )+
-     $                                 ABS( VR( K, IS   ) ) )
-  100             CONTINUE
-                  REMAX = ONE / EMAX
-                  CALL SSCAL( KI, REMAX, VR( 1, IS-1 ), 1 )
-                  CALL SSCAL( KI, REMAX, VR( 1, IS   ), 1 )
-*
-                  DO 110 K = KI + 1, N
-                     VR( K, IS-1 ) = ZERO
-                     VR( K, IS   ) = ZERO
-  110             CONTINUE
-*
-               ELSE IF( NB.EQ.1 ) THEN
-*                 ------------------------------
-*                 version 1: back-transform each vector with GEMV, Q*x.
-                  IF( KI.GT.2 ) THEN
-                     CALL SGEMV( 'N', N, KI-2, ONE, VR, LDVR,
-     $                           WORK( 1    + (IV-1)*N ), 1,
-     $                           WORK( KI-1 + (IV-1)*N ), VR(1,KI-1), 1)
-                     CALL SGEMV( 'N', N, KI-2, ONE, VR, LDVR,
-     $                           WORK( 1  + (IV)*N ), 1,
-     $                           WORK( KI + (IV)*N ), VR( 1, KI ), 1 )
-                  ELSE
-                     CALL SSCAL( N, WORK(KI-1+(IV-1)*N), VR(1,KI-1), 1)
-                     CALL SSCAL( N, WORK(KI  +(IV  )*N), VR(1,KI  ), 1)
-                  END IF
-*
-                  EMAX = ZERO
-                  DO 120 K = 1, N
-                     EMAX = MAX( EMAX, ABS( VR( K, KI-1 ) )+
-     $                                 ABS( VR( K, KI   ) ) )
-  120             CONTINUE
-                  REMAX = ONE / EMAX
-                  CALL SSCAL( N, REMAX, VR( 1, KI-1 ), 1 )
-                  CALL SSCAL( N, REMAX, VR( 1, KI   ), 1 )
-*
-               ELSE
-*                 ------------------------------
-*                 version 2: back-transform block of vectors with GEMM
-*                 zero out below vector
-                  DO K = KI + 1, N
-                     WORK( K + (IV-1)*N ) = ZERO
-                     WORK( K + (IV  )*N ) = ZERO
+*                 Analyze off-diagonal block.
+*                 Note: Rough upper bound for infinity-norm.
+*     
+                  TOFFNORM = ZERO
+                  DO I = IMIN, IB - 1, NBMAX
+                     TEMP = ZERO
+                     DO K = IB, IBEND
+                        TEMP = TEMP + SASUM( MIN( IB - I, NBMAX ),
+     $                                       T( I, K ), 1 )
+                     END DO
+                     TOFFNORM = MAX( TOFFNORM, TEMP )
                   END DO
-                  ISCOMPLEX( IV-1 ) = -IP
-                  ISCOMPLEX( IV   ) =  IP
-                  IV = IV - 1
-*                 back-transform and normalization is done below
-               END IF
-            END IF
-
-            IF( NB.GT.1 ) THEN
-*              --------------------------------------------------------
-*              Blocked version of back-transform
-*              For complex case, KI2 includes both vectors (KI-1 and KI)
-               IF( IP.EQ.0 ) THEN
-                  KI2 = KI
-               ELSE
-                  KI2 = KI - 1
-               END IF
-
-*              Columns IV:NB of work are valid vectors.
-*              When the number of vectors stored reaches NB-1 or NB,
-*              or if this was last vector, do the GEMM
-               IF( (IV.LE.2) .OR. (KI2.EQ.1) ) THEN
-                  CALL SGEMM( 'N', 'N', N, NB-IV+1, KI2+NB-IV, ONE,
-     $                        VR, LDVR,
-     $                        WORK( 1 + (IV)*N    ), N,
-     $                        ZERO,
-     $                        WORK( 1 + (NB+IV)*N ), N )
-*                 normalize vectors
-                  DO K = IV, NB
-                     IF( ISCOMPLEX(K).EQ.0 ) THEN
-*                       real eigenvector
-                        II = ISAMAX( N, WORK( 1 + (NB+K)*N ), 1 )
-                        REMAX = ONE / ABS( WORK( II + (NB+K)*N ) )
-                     ELSE IF( ISCOMPLEX(K).EQ.1 ) THEN
-*                       first eigenvector of conjugate pair
-                        EMAX = ZERO
-                        DO II = 1, N
-                           EMAX = MAX( EMAX,
-     $                                 ABS( WORK( II + (NB+K  )*N ) )+
-     $                                 ABS( WORK( II + (NB+K+1)*N ) ) )
+*
+*                 --------------------------------------------------
+*                 Solve each RHS against diagonal block.
+*                 Note: Back substitution is safeguarded to avoid
+*                 overflow.
+*     
+                  DO J = JB, JBEND
+                     NB = MIN( JLIST( J ) - 1, IBEND) - IB + 1
+                     SHIFT = SHIFTS( J )
+                     BOUND = VBOUNDS( J )
+                     SMIN = MAX( ULP * CABS1( SHIFT ), SMLNUM )
+                     IF( VDSIZES( J ).EQ.1 .AND. NB.GT.0 ) THEN
+*
+*                       Solve real RHS against diagonal block.
+*
+                        VDIAG( 1, 1 ) = VDIAGS( J, 1 )
+                        DO K = IB + NB - 1, IB, -1
+                           CNORM = CNORMS( K - IB + 1 )
+                           SELECT CASE( TDSIZES( K - IB + 1 ) )
+                           CASE( 1 )
+*
+*                             1x1 diagonal block with real RHS.
+*
+                              CALL SLALN2( .FALSE., 1, 1, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X( 1, 1 ) = TEMP * X( 1, 1 )
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X( 1, 1 ) = TEMP * X( 1, 1 )
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                       WORK( IMIN, J ), 1 )
+                                 VDIAG( 1, 1 ) = SCALE * VDIAG( 1, 1 )
+                              END IF
+                              WORK( K, J ) = X( 1, 1 )
+                              CALL SAXPY( K - IB, -WORK( K, J ),
+     $                                    T( IB, K ), 1,
+     $                                    WORK( IB, J ), 1 )
+                              IF( SCALE.EQ.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SASUM( K - IMIN,
+     $                                          WORK( IMIN, J ), 1 )
+                              END IF
+                           CASE( 2 )
+*
+*                             2x2 diagonal block with real RHS.
+*
+                              CALL SLALN2( .FALSE., 2, 1, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X( : , 1 ) = TEMP * X( : , 1 )
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X( : , 1 ) = TEMP * X( : , 1 )
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                       WORK( IMIN, J ), 1 )
+                                 VDIAG( 1, 1 ) = SCALE * VDIAG( 1, 1 )
+                              END IF
+                              WORK( K:K+1, J ) = X( : , 1 )
+                              CALL SGEMM( 'N', 'N', K - IB, 1, 2,
+     $                                    NEGONE, T( IB, K ), LDT,
+     $                                    WORK( K, J ), N,
+     $                                    ONE, WORK( IB, J ), N )
+                              IF( SCALE.EQ.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SASUM( K - IMIN,
+     $                                          WORK( IMIN, J ), 1 )
+                              END IF
+                           END SELECT
                         END DO
-                        REMAX = ONE / EMAX
-*                    else if ISCOMPLEX(K).EQ.-1
-*                       second eigenvector of conjugate pair
-*                       reuse same REMAX as previous K
-                     END IF
-                     CALL SSCAL( N, REMAX, WORK( 1 + (NB+K)*N ), 1 )
-                  END DO
-                  CALL SLACPY( 'F', N, NB-IV+1,
-     $                         WORK( 1 + (NB+IV)*N ), N,
-     $                         VR( 1, KI2 ), LDVR )
-                  IV = NB
-               ELSE
-                  IV = IV - 1
-               END IF
-            END IF ! blocked back-transform
 *
-            IS = IS - 1
-            IF( IP.NE.0 )
-     $         IS = IS - 1
-  140    CONTINUE
+*                       Rescale real RHS for back substitution
+*     
+                        XNORM = SASUM( NB, WORK( IB, J ), 1 )
+                        TEMP = OVFL - BOUND
+                        IF( XNORM.GE.ONE
+     $                      .AND. TOFFNORM.GT.TEMP/XNORM ) THEN
+                           SCALE = ( OVFL * HALF / TOFFNORM ) / XNORM
+                        ELSE IF( XNORM.LT.ONE
+     $                           .AND. TOFFNORM*XNORM.GT.TEMP) THEN
+                           SCALE = OVFL * HALF / TOFFNORM
+                        ELSE
+                           SCALE = ONE
+                        END IF
+                        IF( SCALE.NE.ONE ) THEN
+                           CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                 WORK( IMIN, J ), 1 )
+                           VDIAG( 1, 1 ) = SCALE * VDIAG( 1, 1 )
+                           BOUND = SASUM( IB - IMIN,
+     $                                    WORK( IMIN, J ), 1 )
+                           XNORM = SCALE * XNORM
+                        END IF
+                        BOUND = XNORM * TOFFNORM + BOUND
+                        VBOUNDS( J ) = BOUND
+                        VDIAGS( J, 1 ) = VDIAG( 1, 1 )
+                     ELSE IF( VDSIZES( J ).EQ.2 .AND. NB.GT.0 ) THEN
+*
+*                       Solve complex RHS against diagonal block.
+*
+                        VDIAG = VDIAGS( J:J+1, : )
+                        DO K = IB + NB - 1, IB, -1
+                           CNORM = CNORMS( K - IB + 1 )
+                           SELECT CASE( TDSIZES( K - IB + 1 ) )
+                           CASE( 1 )
+*
+*                             1x1 diagonal block with complex RHS.
+*
+                              CALL SLALN2( .FALSE., 1, 2, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X( 1, : ) = TEMP * X( 1, : )
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X( 1, : ) = TEMP * X( 1, : )
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                       WORK( IMIN, J ), 1 )
+                                 CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                       WORK( IMIN, J+1 ), 1 )
+                                 VDIAG = SCALE * VDIAG
+                              END IF
+                              WORK( K, J:J+1 ) = X( 1, : )
+                              CALL SGEMM( 'N', 'N', K - IB, 2, 1,
+     $                                    NEGONE, T( IB, K ), LDT,
+     $                                    WORK( K, J ), N,
+     $                                    ONE, WORK( IB, J ), N )
+                              IF( SCALE.EQ.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SUM( ABS( WORK( IMIN : K-1,
+     $                                                   J : J+1 ) ) )
+                              END IF
+                           CASE( 2 )
+*
+*                             2x2 diagonal block with complex RHS.
+*
+                              CALL SLALN2( .FALSE., 2, 2, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X = TEMP * X
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X = TEMP * X
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                       WORK( IMIN, J ), 1 )
+                                 CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                       WORK( IMIN, J+1 ), 1 )
+                                 VDIAG = SCALE * VDIAG
+                              END IF
+                              WORK( K:K+1, J:J+1 ) = X
+                              CALL SGEMM( 'N', 'N', K - IB, 2, 2,
+     $                                    NEGONE, T( IB, K ), LDT,
+     $                                    WORK( K, J ), N,
+     $                                    ONE, WORK( IB, J ), N )
+                              IF( SCALE.EQ.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SUM( ABS( WORK( IMIN:K-1,
+     $                                                   J:J+1 ) ) )
+                              END IF
+                           END SELECT
+                        END DO
+*
+*                       Rescale complex RHS for back substitution.
+*
+                        XNORM = SUM( ABS( WORK( IB:IB+NB-1,
+     $                                          J:J+1 ) ))
+                        TEMP = OVFL - BOUND
+                        IF( XNORM.GE.ONE
+     $                      .AND. TOFFNORM.GT.TEMP/XNORM ) THEN
+                           SCALE = ( OVFL * HALF / TOFFNORM ) / XNORM
+                        ELSE IF( XNORM.LT.ONE
+     $                           .AND. TOFFNORM*XNORM.GT.TEMP) THEN
+                           SCALE = OVFL * HALF / TOFFNORM
+                        ELSE
+                           SCALE = ONE
+                        END IF
+                        IF( SCALE.NE.ONE ) THEN
+                           CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                 WORK( IMIN, J ), 1 )
+                           CALL SSCAL( JLIST( J ) - IMIN, SCALE,
+     $                                 WORK( IMIN, J+1 ), 1 )
+                           VDIAG = SCALE * VDIAG
+                           BOUND = SUM( ABS( WORK( IMIN:IB-1,
+     $                                             J:J+1 ) ) )
+                           XNORM = SCALE * XNORM
+                        END IF
+                        BOUND = XNORM * TOFFNORM + BOUND
+                        VBOUNDS( J ) = BOUND
+                        VDIAGS( J:J+1, : ) = VDIAG
+                     END IF
+                  END DO
+*
+*                 Back substitution with block of solution.
+*
+                  NB = IBEND - IB + 1
+                  IF( IB.GT.IMIN )
+     $                 CALL SGEMM( 'N', 'N', IB - IMIN, MB, NB,
+     $                             NEGONE, T( IMIN, IB ), LDT,
+     $                             WORK( IB, JB ), N,
+     $                             ONE, WORK( IMIN, JB ), N )
+                  IBEND = IB - 1
+               END DO
+*
+*              Put diagonal blocks to get triangular eigenvectors.
+*
+               DO J = JB, JBEND
+                  I = JLIST( J )
+                  SELECT CASE( VDSIZES( J ) )
+                  CASE( 1 )
+                     WORK( I, J ) = VDIAGS( J, 1 )
+                  CASE( 2 )
+                     WORK( I:I+1, J:J+1 ) = VDIAGS( J:J+1, : )
+                  END SELECT
+               END DO
+*
+*              -----------------------------------------------------
+*              Copy results to output.
+*              Note: Back transform with Schur vectors if full
+*              eigenvectors are requested.
+*     
+               JOUT = JOUT - MB
+               IF( BACKTRANSFORM ) THEN
+                  IF( LWORK .GE. 4*N ) THEN
+*                  
+*                    Blocked back transform.
+*
+                     CALL SGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
+     $                           ONE, VR( 1, IMIN ), LDVR,
+     $                           WORK( IMIN, JB ), N,
+     $                           ZERO, WORK( 1, JMAX + JB ), N )
+                     VR( 1 : N, JOUT : JOUT + MB - 1 )
+     $                    = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
+                  ELSE
+*                    
+*                    Back transform with minimal workspace
+*                    
+                     CALL SGEMV( 'N', N, IMAX - IMIN + 1,
+     $                           ONE, VR( 1, IMIN ), LDVR,
+     $                           WORK( IMIN, 2 ), 1,
+     $                           ZERO, WORK( 1, 3 ), 1 )
+                     IF( MB.EQ.2 )
+     $                    CALL SGEMV( 'N', N, IMAX - IMIN + 1,
+     $                                ONE, VR( 1, IMIN ), LDVR,
+     $                                WORK( IMIN, 1 ), 1,
+     $                                ZERO, WORK( 1, 2 ), 1 )
+                     VR( 1 : N, JOUT : JOUT + MB - 1 )
+     $                    = WORK( 1 : N, 1 + JB : 1 + JBEND )
+                  END IF
+               ELSE
+                  VR( 1 : IMIN - 1, JOUT : JOUT + MB - 1 ) = ZERO
+                  VR( IMIN : IMAX , JOUT : JOUT + MB - 1 )
+     $                 = WORK( IMIN : IMAX, JB : JBEND )
+                  VR( IMAX + 1 : N, JOUT : JOUT + MB - 1 ) = ZERO
+               END IF
+*
+*              Normalize eigenvectors.
+*
+               DO K = JB, JBEND
+                  J = JOUT + K - JB
+                  SELECT CASE( VDSIZES( K ) )
+                  CASE( 1 )
+                     SCALE = ONE / MAXVAL( ABS( VR( : , J ) ) )
+                     CALL SSCAL( N, SCALE, VR( 1, J ), 1 )
+                  CASE( 2 )
+                     BOUND = SMLNUM
+                     DO I = 1, N
+                        BOUND = MAX( BOUND,
+     $                               SUM( ABS( VR( I, J:J+1 ) ) ) )
+                     END DO
+                     SCALE = ONE / BOUND
+                     CALL SSCAL( N, SCALE, VR( 1, J ), 1 )
+                     CALL SSCAL( N, SCALE, VR( 1, J+1 ), 1 )
+                  END SELECT
+               END DO
+*              
+*              Workspace is now empty.
+*
+               IMIN = 1
+               IMAX = 0
+               JB = JMAX + 1
+               JBEND = JMAX
+            END IF
+         END DO
       END IF
 
+*
+*     --------------------------------------------------------------
+*     Compute left eigenvectors.
+*     
       IF( LEFTV ) THEN
+         IMIN = N + 1
+         IMAX = N
+         JB = 1
+         JBEND = 0
+         JOUT = 1
+         JLIST = 0
+         DO JV = 1, N
 *
-*        ============================================================
-*        Compute left eigenvectors.
+*           --------------------------------------------------------
+*           Add current eigenvector to workspace if needed.
 *
-*        IV is index of column in current block.
-*        For complex left vector, uses IV for real part and IV+1 for complex part.
-*        Non-blocked version always uses IV=1;
-*        blocked     version starts with IV=1, goes up to NB-1 or NB.
-*        (Note the "0-th" column is used for 1-norms computed above.)
-         IV = 1
-         IP = 0
-         IS = 1
-         DO 260 KI = 1, N
-            IF( IP.EQ.1 ) THEN
-*              previous iteration (ki-1) was first of conjugate pair,
-*              so this ki is second of conjugate pair; skip to end of loop
-               IP = -1
-               GO TO 260
-            ELSE IF( KI.EQ.N ) THEN
-*              last column, so this ki must be real eigenvalue
-               IP = 0
-            ELSE IF( T( KI+1, KI ).EQ.ZERO ) THEN
-*              zero on sub-diagonal, so this ki is real eigenvalue
-               IP = 0
-            ELSE
-*              non-zero on sub-diagonal, so this ki is first of conjugate pair
-               IP = 1
+            DSIZE = 1
+            IF( JV.LT.N ) THEN
+               IF( T( JV+1, JV ).NE.ZERO )
+     $              DSIZE = 2
             END IF
-*
+            IF( JV.GT.1 ) THEN
+               IF( T( JV, JV-1 ).NE.ZERO )
+     $              DSIZE = 0
+            END IF
+            SELECTV = DSIZE.NE.0
             IF( SOMEV ) THEN
-               IF( .NOT.SELECT( KI ) )
-     $            GO TO 260
+               SELECTV = SELECTV .AND. SELECT( JV )
+            ENDIF
+            IF( SELECTV ) THEN
+               IMIN = MIN( IMIN, JV )
+               JBEND = JBEND + DSIZE
+               SELECT CASE( DSIZE )               
+               CASE( 1 )
+*
+*                 --------------------------------------------------
+*                 Add real eigenvector to workspace.
+*
+                  SHIFT = CMPLX( T( JV, JV ) )
+                  X( 1, 1 ) = ONE
+                  WORK( IMIN : JV, JBEND ) = ZERO
+                  DO I = JV + 1, IMAX
+                     WORK( I, JBEND ) = -T( JV, I )
+                  END DO
+                  BOUND = SASUM( IMAX - JV, WORK( JV + 1, JBEND ), 1 )
+                  IF( BOUND.GE.OVFL ) THEN
+                     SCALE = HALF * OVFL / BOUND
+                     X( 1, 1 ) = SCALE * X( 1, 1 )
+                     BOUND = HALF * OVFL
+                     CALL SSCAL( IMAX - JV, SCALE,
+     $                           WORK( JV + 1, JBEND ), 1 )
+                  END IF
+                  JLIST( JBEND ) = JV
+                  VDSIZES( JBEND ) = DSIZE
+                  SHIFTS( JBEND ) = SHIFT
+                  VDIAGS( JBEND , 1 ) = X( 1, 1 )
+                  VBOUNDS( JBEND ) = BOUND
+               CASE( 2 )
+*     
+*                 --------------------------------------------------
+*                 Add complex eigenvector to workspace.
+*
+*                 Compute eigenvalues of 2x2 diagonal block
+*                 Note: We assume 2x2 diagonal blocks of Schur matrices
+*                 have complex eigenvalues/eigenvectors. DHSEQR
+*                 guarantees that these blocks satisfy D(1,1)=D(2,2) and
+*                 D(2,1)*D(1,2)<0, so we don't worry too much about
+*                 numerical nastiness.
+*
+                  D = T( JV : JV+1, JV : JV+1 )
+                  SHIFT = CMPLX( HALF * ( D(1,1) + D(2,2) ) )
+                  IF( D(1,1) .NE. D(2,2)
+     $                .OR. D(2,1) * D(1,2) .GT. ZERO ) THEN
+                     TEMP = -D(1,2) * D(2,1) - SQ( D(1,1) - D(2,2) ) / 4
+                     TEMP = SQRT( MAX( TEMP, SMLNUM ) )
+                  ELSE IF( D(2,1) .LT. ZERO ) THEN
+                     TEMP = SQRT( -D(2,1) ) * SQRT( D(1,2) )
+                  ELSE
+                     TEMP = SQRT( D(2,1) ) * SQRT( -D(1,2) )
+                  END IF
+                  SHIFT = SHIFT - CMPLX( ZERO, TEMP )
+*
+*                 Compute eigenvectors of 2x2 diagonal block
+*                 Note: We apply a safe solve against a vector
+*                 orthogonal to the range of D-SHIFT*I.
+*     
+                  SMIN = MAX( ULP * CABS1( SHIFT ), SMLNUM )
+                  B( 1, 1 ) = -D( 1, 2 )
+                  B( 2, 1 ) = D( 1, 1 ) - REAL( SHIFT )
+                  B( 1, 2 ) = ZERO
+                  B( 2, 2 ) = AIMAG( SHIFT )
+                  B = B / SUM( ABS( B ) )
+                  CALL SLALN2( .TRUE., 2, 2, SMIN,
+     $                         ONE, D, 2, ONE, ONE, B, 2,
+     $                         REAL( SHIFT ), AIMAG( SHIFT ), X, 2,
+     $                         SCALE, XNORM, IERR )
+                  X = X / XNORM
+*
+*                 Populate workspace and scale if needed
+*
+                  WORK( IMIN : JV+1, JBEND-1 : JBEND ) = ZERO
+                  CALL SGEMM( 'T', 'N', IMAX - JV - 1, 2, 2,
+     $                        -ONE, T( JV, JV+2 ), LDT, X, 2,
+     $                        ZERO, WORK( JV+2, JBEND-1 ), N )
+                  BOUND = SASUM( IMAX-JV-1, WORK( JV+2, JBEND-1 ), 1 )
+     $                    + SASUM( IMAX-JV-1, WORK( JV+2, JBEND ), 1 )
+                  IF( BOUND.GE.OVFL ) THEN
+                     SCALE = HALF * OVFL / BOUND
+                     X = SCALE * X
+                     BOUND = HALF * OVFL
+                     CALL SSCAL( IMAX-JV-1, SCALE,
+     $                           WORK( JV+2, JBEND-1 ), 1 )
+                     CALL SSCAL( IMAX-JV-1, SCALE,
+     $                           WORK( JV+2, JBEND ), 1 )
+                  END IF
+                  JLIST( JBEND-1 ) = JV
+                  JLIST( JBEND ) = 0
+                  VDSIZES( JBEND-1 ) = DSIZE
+                  VDSIZES( JBEND ) = 0
+                  SHIFTS( JBEND-1 ) = SHIFT
+                  SHIFTS( JBEND ) = CMPLX( ZERO, ZERO )
+                  VDIAGS( JBEND-1:JBEND , : ) = X
+                  VBOUNDS( JBEND-1 ) = BOUND
+                  VBOUNDS( JBEND ) = ZERO
+               END SELECT
             END IF
 *
-*           Compute the KI-th eigenvalue (WR,WI).
+*           --------------------------------------------------------
+*           Process workspace if full or if all eigenvectors are
+*           found.
 *
-            WR = T( KI, KI )
-            WI = ZERO
-            IF( IP.NE.0 )
-     $         WI = SQRT( ABS( T( KI, KI+1 ) ) )*
-     $              SQRT( ABS( T( KI+1, KI ) ) )
-            SMIN = MAX( ULP*( ABS( WR )+ABS( WI ) ), SMLNUM )
+            IF( JBEND.GE.JMAX-1
+     $          .OR. ( JV.EQ.N .AND. JB.LE.JBEND ) ) THEN
+               MB = JBEND - JB + 1
 *
-            IF( IP.EQ.0 ) THEN
+*              Blocked forward substitution.
+*              Note: We avoid splitting up 2x2 blocks.
 *
-*              --------------------------------------------------------
-*              Real left eigenvector
-*
-               WORK( KI + IV*N ) = ONE
-*
-*              Form right-hand side.
-*
-               DO 160 K = KI + 1, N
-                  WORK( K + IV*N ) = -T( KI, K )
-  160          CONTINUE
-*
-*              Solve transposed quasi-triangular system:
-*              [ T(KI+1:N,KI+1:N) - WR ]**T * X = SCALE*WORK
-*
-               VMAX = ONE
-               VCRIT = BIGNUM
-*
-               JNXT = KI + 1
-               DO 170 J = KI + 1, N
-                  IF( J.LT.JNXT )
-     $               GO TO 170
-                  J1 = J
-                  J2 = J
-                  JNXT = J + 1
-                  IF( J.LT.N ) THEN
-                     IF( T( J+1, J ).NE.ZERO ) THEN
-                        J2 = J + 1
-                        JNXT = J + 2
-                     END IF
+               IB = IMIN
+               DO WHILE( IB.LE.N )
+                  IBEND = MIN( IB + NBMAX - 1, IMAX )
+                  IF( IBEND.LT.N ) THEN
+                     IF( T( IBEND+1, IBEND ).NE.ZERO )
+     $                    IBEND = IBEND - 1
                   END IF
+                  NB = IBEND - IB + 1
 *
-                  IF( J1.EQ.J2 ) THEN
-*
-*                    1-by-1 diagonal block
-*
-*                    Scale if necessary to avoid overflow when forming
-*                    the right-hand side.
-*
-                     IF( WORK( J ).GT.VCRIT ) THEN
-                        REC = ONE / VMAX
-                        CALL SSCAL( N-KI+1, REC, WORK( KI+IV*N ), 1 )
-                        VMAX = ONE
-                        VCRIT = BIGNUM
+*                 Analyze diagonal block.
+*                 Note: We determine whether each diagonal entry belongs
+*                 to a 2x2 block, compute the 1-norms of the
+*                 off-diagonal rows, and compute the entry-wise 1-norm.
+*     
+                  DO I = IB, IBEND
+                     DSIZE = 1
+                     IF( I.LT.IBEND ) THEN
+                        IF( T( I+1, I ).NE.ZERO )
+     $                       DSIZE = 2
                      END IF
-*
-                     WORK( J+IV*N ) = WORK( J+IV*N ) -
-     $                                SDOT( J-KI-1, T( KI+1, J ), 1,
-     $                                      WORK( KI+1+IV*N ), 1 )
-*
-*                    Solve [ T(J,J) - WR ]**T * X = WORK
-*
-                     CALL SLALN2( .FALSE., 1, 1, SMIN, ONE, T( J, J ),
-     $                            LDT, ONE, ONE, WORK( J+IV*N ), N, WR,
-     $                            ZERO, X, 2, SCALE, XNORM, IERR )
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE )
-     $                  CALL SSCAL( N-KI+1, SCALE, WORK( KI+IV*N ), 1 )
-                     WORK( J+IV*N ) = X( 1, 1 )
-                     VMAX = MAX( ABS( WORK( J+IV*N ) ), VMAX )
-                     VCRIT = BIGNUM / VMAX
-*
-                  ELSE
-*
-*                    2-by-2 diagonal block
-*
-*                    Scale if necessary to avoid overflow when forming
-*                    the right-hand side.
-*
-                     BETA = MAX( WORK( J ), WORK( J+1 ) )
-                     IF( BETA.GT.VCRIT ) THEN
-                        REC = ONE / VMAX
-                        CALL SSCAL( N-KI+1, REC, WORK( KI+IV*N ), 1 )
-                        VMAX = ONE
-                        VCRIT = BIGNUM
+                     IF( I.GT.IB ) THEN
+                        IF( T( I, I-1 ).NE.ZERO )
+     $                       DSIZE = 0
                      END IF
-*
-                     WORK( J+IV*N ) = WORK( J+IV*N ) -
-     $                                SDOT( J-KI-1, T( KI+1, J ), 1,
-     $                                      WORK( KI+1+IV*N ), 1 )
-*
-                     WORK( J+1+IV*N ) = WORK( J+1+IV*N ) -
-     $                                  SDOT( J-KI-1, T( KI+1, J+1 ), 1,
-     $                                        WORK( KI+1+IV*N ), 1 )
-*
-*                    Solve
-*                    [ T(J,J)-WR   T(J,J+1)      ]**T * X = SCALE*( WORK1 )
-*                    [ T(J+1,J)    T(J+1,J+1)-WR ]                ( WORK2 )
-*
-                     CALL SLALN2( .TRUE., 2, 1, SMIN, ONE, T( J, J ),
-     $                            LDT, ONE, ONE, WORK( J+IV*N ), N, WR,
-     $                            ZERO, X, 2, SCALE, XNORM, IERR )
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE )
-     $                  CALL SSCAL( N-KI+1, SCALE, WORK( KI+IV*N ), 1 )
-                     WORK( J  +IV*N ) = X( 1, 1 )
-                     WORK( J+1+IV*N ) = X( 2, 1 )
-*
-                     VMAX = MAX( ABS( WORK( J  +IV*N ) ),
-     $                           ABS( WORK( J+1+IV*N ) ), VMAX )
-                     VCRIT = BIGNUM / VMAX
-*
-                  END IF
-  170          CONTINUE
-*
-*              Copy the vector x or Q*x to VL and normalize.
-*
-               IF( .NOT.OVER ) THEN
-*                 ------------------------------
-*                 no back-transform: copy x to VL and normalize.
-                  CALL SCOPY( N-KI+1, WORK( KI + IV*N ), 1,
-     $                                VL( KI, IS ), 1 )
-*
-                  II = ISAMAX( N-KI+1, VL( KI, IS ), 1 ) + KI - 1
-                  REMAX = ONE / ABS( VL( II, IS ) )
-                  CALL SSCAL( N-KI+1, REMAX, VL( KI, IS ), 1 )
-*
-                  DO 180 K = 1, KI - 1
-                     VL( K, IS ) = ZERO
-  180             CONTINUE
-*
-               ELSE IF( NB.EQ.1 ) THEN
-*                 ------------------------------
-*                 version 1: back-transform each vector with GEMV, Q*x.
-                  IF( KI.LT.N )
-     $               CALL SGEMV( 'N', N, N-KI, ONE,
-     $                           VL( 1, KI+1 ), LDVL,
-     $                           WORK( KI+1 + IV*N ), 1,
-     $                           WORK( KI   + IV*N ), VL( 1, KI ), 1 )
-*
-                  II = ISAMAX( N, VL( 1, KI ), 1 )
-                  REMAX = ONE / ABS( VL( II, KI ) )
-                  CALL SSCAL( N, REMAX, VL( 1, KI ), 1 )
-*
-               ELSE
-*                 ------------------------------
-*                 version 2: back-transform block of vectors with GEMM
-*                 zero out above vector
-*                 could go from KI-NV+1 to KI-1
-                  DO K = 1, KI - 1
-                     WORK( K + IV*N ) = ZERO
+                     SELECT CASE( DSIZE )
+                     CASE( 1 )
+                        BOUND = SASUM( IBEND - I, T( I, I+1 ), LDT )
+                     CASE( 2 )
+                        BOUND = SASUM( IBEND-I-1, T( I, I+2 ), 1 )
+     $                          + SASUM( IBEND-I-1, T( I+1, I+2 ), 1 )
+                     CASE( 0 )
+                        BOUND = ZERO
+                     END SELECT
+                     TDSIZES( I - IB + 1 ) = DSIZE
+                     CNORMS( I - IB + 1 ) = BOUND
                   END DO
-                  ISCOMPLEX( IV ) = IP
-*                 back-transform and normalization is done below
-               END IF
-            ELSE
 *
-*              --------------------------------------------------------
-*              Complex left eigenvector.
-*
-*              Initial solve:
-*              [ ( T(KI,KI)    T(KI,KI+1)  )**T - (WR - I* WI) ]*X = 0.
-*              [ ( T(KI+1,KI) T(KI+1,KI+1) )                   ]
-*
-               IF( ABS( T( KI, KI+1 ) ).GE.ABS( T( KI+1, KI ) ) ) THEN
-                  WORK( KI   + (IV  )*N ) = WI / T( KI, KI+1 )
-                  WORK( KI+1 + (IV+1)*N ) = ONE
-               ELSE
-                  WORK( KI   + (IV  )*N ) = ONE
-                  WORK( KI+1 + (IV+1)*N ) = -WI / T( KI+1, KI )
-               END IF
-               WORK( KI+1 + (IV  )*N ) = ZERO
-               WORK( KI   + (IV+1)*N ) = ZERO
-*
-*              Form right-hand side.
-*
-               DO 190 K = KI + 2, N
-                  WORK( K+(IV  )*N ) = -WORK( KI  +(IV  )*N )*T(KI,  K)
-                  WORK( K+(IV+1)*N ) = -WORK( KI+1+(IV+1)*N )*T(KI+1,K)
-  190          CONTINUE
-*
-*              Solve transposed quasi-triangular system:
-*              [ T(KI+2:N,KI+2:N)**T - (WR-i*WI) ]*X = WORK1+i*WORK2
-*
-               VMAX = ONE
-               VCRIT = BIGNUM
-*
-               JNXT = KI + 2
-               DO 200 J = KI + 2, N
-                  IF( J.LT.JNXT )
-     $               GO TO 200
-                  J1 = J
-                  J2 = J
-                  JNXT = J + 1
-                  IF( J.LT.N ) THEN
-                     IF( T( J+1, J ).NE.ZERO ) THEN
-                        J2 = J + 1
-                        JNXT = J + 2
-                     END IF
-                  END IF
-*
-                  IF( J1.EQ.J2 ) THEN
-*
-*                    1-by-1 diagonal block
-*
-*                    Scale if necessary to avoid overflow when
-*                    forming the right-hand side elements.
-*
-                     IF( WORK( J ).GT.VCRIT ) THEN
-                        REC = ONE / VMAX
-                        CALL SSCAL( N-KI+1, REC, WORK(KI+(IV  )*N), 1 )
-                        CALL SSCAL( N-KI+1, REC, WORK(KI+(IV+1)*N), 1 )
-                        VMAX = ONE
-                        VCRIT = BIGNUM
-                     END IF
-*
-                     WORK( J+(IV  )*N ) = WORK( J+(IV)*N ) -
-     $                                  SDOT( J-KI-2, T( KI+2, J ), 1,
-     $                                        WORK( KI+2+(IV)*N ), 1 )
-                     WORK( J+(IV+1)*N ) = WORK( J+(IV+1)*N ) -
-     $                                  SDOT( J-KI-2, T( KI+2, J ), 1,
-     $                                        WORK( KI+2+(IV+1)*N ), 1 )
-*
-*                    Solve [ T(J,J)-(WR-i*WI) ]*(X11+i*X12)= WK+I*WK2
-*
-                     CALL SLALN2( .FALSE., 1, 2, SMIN, ONE, T( J, J ),
-     $                            LDT, ONE, ONE, WORK( J+IV*N ), N, WR,
-     $                            -WI, X, 2, SCALE, XNORM, IERR )
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE ) THEN
-                        CALL SSCAL( N-KI+1, SCALE, WORK(KI+(IV  )*N), 1)
-                        CALL SSCAL( N-KI+1, SCALE, WORK(KI+(IV+1)*N), 1)
-                     END IF
-                     WORK( J+(IV  )*N ) = X( 1, 1 )
-                     WORK( J+(IV+1)*N ) = X( 1, 2 )
-                     VMAX = MAX( ABS( WORK( J+(IV  )*N ) ),
-     $                           ABS( WORK( J+(IV+1)*N ) ), VMAX )
-                     VCRIT = BIGNUM / VMAX
-*
-                  ELSE
-*
-*                    2-by-2 diagonal block
-*
-*                    Scale if necessary to avoid overflow when forming
-*                    the right-hand side elements.
-*
-                     BETA = MAX( WORK( J ), WORK( J+1 ) )
-                     IF( BETA.GT.VCRIT ) THEN
-                        REC = ONE / VMAX
-                        CALL SSCAL( N-KI+1, REC, WORK(KI+(IV  )*N), 1 )
-                        CALL SSCAL( N-KI+1, REC, WORK(KI+(IV+1)*N), 1 )
-                        VMAX = ONE
-                        VCRIT = BIGNUM
-                     END IF
-*
-                     WORK( J  +(IV  )*N ) = WORK( J+(IV)*N ) -
-     $                                SDOT( J-KI-2, T( KI+2, J ), 1,
-     $                                      WORK( KI+2+(IV)*N ), 1 )
-*
-                     WORK( J  +(IV+1)*N ) = WORK( J+(IV+1)*N ) -
-     $                                SDOT( J-KI-2, T( KI+2, J ), 1,
-     $                                      WORK( KI+2+(IV+1)*N ), 1 )
-*
-                     WORK( J+1+(IV  )*N ) = WORK( J+1+(IV)*N ) -
-     $                                SDOT( J-KI-2, T( KI+2, J+1 ), 1,
-     $                                      WORK( KI+2+(IV)*N ), 1 )
-*
-                     WORK( J+1+(IV+1)*N ) = WORK( J+1+(IV+1)*N ) -
-     $                                SDOT( J-KI-2, T( KI+2, J+1 ), 1,
-     $                                      WORK( KI+2+(IV+1)*N ), 1 )
-*
-*                    Solve 2-by-2 complex linear equation
-*                    [ (T(j,j)   T(j,j+1)  )**T - (wr-i*wi)*I ]*X = SCALE*B
-*                    [ (T(j+1,j) T(j+1,j+1))                  ]
-*
-                     CALL SLALN2( .TRUE., 2, 2, SMIN, ONE, T( J, J ),
-     $                            LDT, ONE, ONE, WORK( J+IV*N ), N, WR,
-     $                            -WI, X, 2, SCALE, XNORM, IERR )
-*
-*                    Scale if necessary
-*
-                     IF( SCALE.NE.ONE ) THEN
-                        CALL SSCAL( N-KI+1, SCALE, WORK(KI+(IV  )*N), 1)
-                        CALL SSCAL( N-KI+1, SCALE, WORK(KI+(IV+1)*N), 1)
-                     END IF
-                     WORK( J  +(IV  )*N ) = X( 1, 1 )
-                     WORK( J  +(IV+1)*N ) = X( 1, 2 )
-                     WORK( J+1+(IV  )*N ) = X( 2, 1 )
-                     WORK( J+1+(IV+1)*N ) = X( 2, 2 )
-                     VMAX = MAX( ABS( X( 1, 1 ) ), ABS( X( 1, 2 ) ),
-     $                           ABS( X( 2, 1 ) ), ABS( X( 2, 2 ) ),
-     $                           VMAX )
-                     VCRIT = BIGNUM / VMAX
-*
-                  END IF
-  200          CONTINUE
-*
-*              Copy the vector x or Q*x to VL and normalize.
-*
-               IF( .NOT.OVER ) THEN
-*                 ------------------------------
-*                 no back-transform: copy x to VL and normalize.
-                  CALL SCOPY( N-KI+1, WORK( KI + (IV  )*N ), 1,
-     $                        VL( KI, IS   ), 1 )
-                  CALL SCOPY( N-KI+1, WORK( KI + (IV+1)*N ), 1,
-     $                        VL( KI, IS+1 ), 1 )
-*
-                  EMAX = ZERO
-                  DO 220 K = KI, N
-                     EMAX = MAX( EMAX, ABS( VL( K, IS   ) )+
-     $                                 ABS( VL( K, IS+1 ) ) )
-  220             CONTINUE
-                  REMAX = ONE / EMAX
-                  CALL SSCAL( N-KI+1, REMAX, VL( KI, IS   ), 1 )
-                  CALL SSCAL( N-KI+1, REMAX, VL( KI, IS+1 ), 1 )
-*
-                  DO 230 K = 1, KI - 1
-                     VL( K, IS   ) = ZERO
-                     VL( K, IS+1 ) = ZERO
-  230             CONTINUE
-*
-               ELSE IF( NB.EQ.1 ) THEN
-*                 ------------------------------
-*                 version 1: back-transform each vector with GEMV, Q*x.
-                  IF( KI.LT.N-1 ) THEN
-                     CALL SGEMV( 'N', N, N-KI-1, ONE,
-     $                           VL( 1, KI+2 ), LDVL,
-     $                           WORK( KI+2 + (IV)*N ), 1,
-     $                           WORK( KI   + (IV)*N ),
-     $                           VL( 1, KI ), 1 )
-                     CALL SGEMV( 'N', N, N-KI-1, ONE,
-     $                           VL( 1, KI+2 ), LDVL,
-     $                           WORK( KI+2 + (IV+1)*N ), 1,
-     $                           WORK( KI+1 + (IV+1)*N ),
-     $                           VL( 1, KI+1 ), 1 )
-                  ELSE
-                     CALL SSCAL( N, WORK(KI+  (IV  )*N), VL(1, KI  ), 1)
-                     CALL SSCAL( N, WORK(KI+1+(IV+1)*N), VL(1, KI+1), 1)
-                  END IF
-*
-                  EMAX = ZERO
-                  DO 240 K = 1, N
-                     EMAX = MAX( EMAX, ABS( VL( K, KI   ) )+
-     $                                 ABS( VL( K, KI+1 ) ) )
-  240             CONTINUE
-                  REMAX = ONE / EMAX
-                  CALL SSCAL( N, REMAX, VL( 1, KI   ), 1 )
-                  CALL SSCAL( N, REMAX, VL( 1, KI+1 ), 1 )
-*
-               ELSE
-*                 ------------------------------
-*                 version 2: back-transform block of vectors with GEMM
-*                 zero out above vector
-*                 could go from KI-NV+1 to KI-1
-                  DO K = 1, KI - 1
-                     WORK( K + (IV  )*N ) = ZERO
-                     WORK( K + (IV+1)*N ) = ZERO
+*                 Analyze off-diagonal block.
+*                 Note: Compute 1-norm.
+*     
+                  TOFFNORM = ZERO
+                  DO I = IBEND + 1, IMAX
+                     TOFFNORM = MAX( SASUM( NB, T( IB, I ), 1 ),
+     $                               TOFFNORM )
                   END DO
-                  ISCOMPLEX( IV   ) =  IP
-                  ISCOMPLEX( IV+1 ) = -IP
-                  IV = IV + 1
-*                 back-transform and normalization is done below
-               END IF
-            END IF
-
-            IF( NB.GT.1 ) THEN
-*              --------------------------------------------------------
-*              Blocked version of back-transform
-*              For complex case, KI2 includes both vectors (KI and KI+1)
-               IF( IP.EQ.0 ) THEN
-                  KI2 = KI
-               ELSE
-                  KI2 = KI + 1
-               END IF
-
-*              Columns 1:IV of work are valid vectors.
-*              When the number of vectors stored reaches NB-1 or NB,
-*              or if this was last vector, do the GEMM
-               IF( (IV.GE.NB-1) .OR. (KI2.EQ.N) ) THEN
-                  CALL SGEMM( 'N', 'N', N, IV, N-KI2+IV, ONE,
-     $                        VL( 1, KI2-IV+1 ), LDVL,
-     $                        WORK( KI2-IV+1 + (1)*N ), N,
-     $                        ZERO,
-     $                        WORK( 1 + (NB+1)*N ), N )
-*                 normalize vectors
-                  DO K = 1, IV
-                     IF( ISCOMPLEX(K).EQ.0) THEN
-*                       real eigenvector
-                        II = ISAMAX( N, WORK( 1 + (NB+K)*N ), 1 )
-                        REMAX = ONE / ABS( WORK( II + (NB+K)*N ) )
-                     ELSE IF( ISCOMPLEX(K).EQ.1) THEN
-*                       first eigenvector of conjugate pair
-                        EMAX = ZERO
-                        DO II = 1, N
-                           EMAX = MAX( EMAX,
-     $                                 ABS( WORK( II + (NB+K  )*N ) )+
-     $                                 ABS( WORK( II + (NB+K+1)*N ) ) )
+*
+*                 --------------------------------------------------
+*                 Solve each RHS against diagonal block.
+*                 Note: Forward substitution is safeguarded to avoid
+*                 overflow.
+*     
+                  DO J = JB, JBEND
+                     NB = IBEND - MAX( JLIST(J) + VDSIZES(J), IB ) + 1
+                     SHIFT = SHIFTS( J )
+                     BOUND = VBOUNDS( J )
+                     SMIN = MAX( ULP * CABS1( SHIFT ), SMLNUM )
+                     IF( VDSIZES( J ).EQ.1 .AND. NB.GT.0 ) THEN
+*
+*                       Solve real RHS against diagonal block.
+*
+                        VDIAG( 1, 1 ) = VDIAGS( J, 1 )
+                        DO K = IBEND - NB + 1, IBEND
+                           CNORM = CNORMS( K - IB + 1 )
+                           SELECT CASE( TDSIZES( K - IB + 1 ) )
+                           CASE( 1 )
+*
+*                             1x1 diagonal block with real RHS.
+*
+                              CALL SLALN2( .TRUE., 1, 1, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X( 1, 1 ) = TEMP * X( 1, 1 )
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X( 1, 1 ) = TEMP * X( 1, 1 )
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( IMAX - JLIST(J), SCALE,
+     $                                       WORK( JLIST(J)+1, J ), 1 )
+                                 VDIAG( 1, 1 ) = SCALE * VDIAG( 1, 1 )
+                              END IF
+                              WORK( K, J ) = X( 1, 1 )
+                              CALL SAXPY( IBEND - K, -WORK( K, J ),
+     $                                    T( K, K+1 ), LDT,
+     $                                    WORK( K+1, J ), 1 )
+                              IF( SCALE.EQ.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SASUM( IMAX - K,
+     $                                          WORK( K+1, J ), 1 )
+                              END IF
+                           CASE( 2 )
+*
+*                             2x2 diagonal block with real RHS.
+*
+                              CALL SLALN2( .TRUE., 2, 1, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X( : , 1 ) = TEMP * X( : , 1 )
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X( : , 1 ) = TEMP * X( : , 1 )
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( IMAX - JLIST(J), SCALE,
+     $                                       WORK( JLIST(J)+1, J ), 1 )
+                                 VDIAG( 1, 1 ) = SCALE * VDIAG( 1, 1 )
+                              END IF
+                              WORK( K:K+1, J ) = X( : , 1 )
+                              CALL SGEMM( 'T', 'N', IBEND - K - 1, 1, 2,
+     $                                    NEGONE, T( K, K+2 ), LDT,
+     $                                    WORK( K, J ), N,
+     $                                    ONE, WORK( K+2, J ), N )
+                              IF( SCALE.NE.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SASUM( IMAX - K - 1,
+     $                                          WORK( K+2, J ), 1 )
+                              END IF
+                           END SELECT
                         END DO
-                        REMAX = ONE / EMAX
-*                    else if ISCOMPLEX(K).EQ.-1
-*                       second eigenvector of conjugate pair
-*                       reuse same REMAX as previous K
+*
+*                       Rescale real RHS for forward substitution
+*     
+                        XNORM = SASUM( NB, WORK( IBEND-NB+1, J ), 1 )
+                        TEMP = OVFL - BOUND
+                        IF( XNORM.GE.ONE
+     $                      .AND. TOFFNORM.GT.TEMP/XNORM ) THEN
+                           SCALE = ( OVFL * HALF / TOFFNORM ) / XNORM
+                        ELSE IF( XNORM.LT.ONE
+     $                           .AND. TOFFNORM*XNORM.GT.TEMP) THEN
+                           SCALE = OVFL * HALF / TOFFNORM
+                        ELSE
+                           SCALE = ONE
+                        END IF
+                        IF( SCALE.NE.ONE ) THEN
+                           CALL SSCAL( IMAX - JLIST(J), SCALE,
+     $                                 WORK( JLIST(J)+1, J ), 1 )
+                           VDIAG( 1, 1 ) = SCALE * VDIAG( 1, 1 )
+                           BOUND = SASUM( IMAX - IBEND,
+     $                                    WORK( IBEND+1, J ), 1 )
+                           XNORM = SCALE * XNORM
+                        END IF
+                        BOUND = XNORM * TOFFNORM + BOUND
+                        VBOUNDS( J ) = BOUND
+                        VDIAGS( J, 1 ) = VDIAG( 1, 1 )
+                     ELSE IF( VDSIZES( J ).EQ.2 .AND. NB.GT.0 ) THEN
+*
+*                       Solve complex RHS against diagonal block.
+*
+                        VDIAG = VDIAGS( J:J+1, : )
+                        DO K = IBEND - NB + 1, IBEND
+                           CNORM = CNORMS( K - IB + 1 )
+                           SELECT CASE( TDSIZES( K - IB + 1 ) )
+                           CASE( 1 )
+*
+*                             1x1 diagonal block with complex RHS.
+*
+                              CALL SLALN2( .TRUE., 1, 2, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X( 1, : ) = TEMP * X( 1, : )
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X( 1, : ) = TEMP * X( 1, : )
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( IMAX - JLIST(J) - 1, SCALE,
+     $                                       WORK( JLIST(J)+2, J ), 1 )
+                                 CALL SSCAL( IMAX - JLIST(J) - 1, SCALE,
+     $                                       WORK( JLIST(J)+2, J+1 ),
+     $                                       1 )
+                                 VDIAG = SCALE * VDIAG
+                              END IF
+                              WORK( K, J:J+1 ) = X( 1, : )
+                              CALL SGEMM( 'T', 'N', IBEND - K, 2, 1,
+     $                                    NEGONE, T( K, K+1 ), LDT,
+     $                                    WORK( K, J ), N,
+     $                                    ONE, WORK( K+1, J ), N )
+                              IF( SCALE.EQ.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SUM( ABS( WORK( K+1 : IMAX,
+     $                                                   J : J+1 ) ) )
+                              END IF
+                           CASE( 2 )
+*
+*                             2x2 diagonal block with complex RHS.
+*
+                              CALL SLALN2( .TRUE., 2, 2, SMIN,
+     $                                     ONE, T( K, K ), LDT,
+     $                                     ONE, ONE,
+     $                                     WORK( K, J ), N,
+     $                                     REAL( SHIFT ),
+     $                                     AIMAG( SHIFT ),
+     $                                     X, 2, SCALE, XNORM, IERR )
+                              TEMP = OVFL - BOUND
+                              IF( XNORM.GE.ONE
+     $                            .AND. CNORM.GT.TEMP/XNORM ) THEN
+                                 TEMP = ( OVFL * HALF / CNORM ) / XNORM
+                                 X = TEMP * X
+                                 SCALE = TEMP * SCALE
+                              ELSE IF( XNORM.LT.ONE
+     $                                 .AND. XNORM*BOUND.GT.TEMP ) THEN
+                                 TEMP = OVFL * HALF / CNORM
+                                 X = TEMP * X
+                                 SCALE = TEMP * SCALE
+                              END IF
+                              IF( SCALE.NE.ONE ) THEN
+                                 CALL SSCAL( IMAX - JLIST(J) - 1, SCALE,
+     $                                       WORK( JLIST(J)+2, J ), 1 )
+                                 CALL SSCAL( IMAX - JLIST(J) - 1, SCALE,
+     $                                       WORK( JLIST(J)+2, J+1 ),
+     $                                       1 )
+                                 VDIAG = SCALE * VDIAG
+                              END IF
+                              WORK( K:K+1, J:J+1 ) = X
+                              CALL SGEMM( 'T', 'N', IBEND - K - 1, 2, 2,
+     $                                    NEGONE, T( K, K+2 ), LDT,
+     $                                    WORK( K, J ), N,
+     $                                    ONE, WORK( K+2, J ), N )
+                              IF( SCALE.EQ.ONE ) THEN
+                                 BOUND = XNORM * CNORM + BOUND
+                              ELSE
+                                 BOUND = SUM( ABS( WORK( K+2 : IMAX,
+     $                                                   J : J+1 ) ) )
+                              END IF
+                           END SELECT
+                        END DO
+*
+*                       Rescale complex RHS for forward substitution.
+*
+                        XNORM = SUM( ABS( WORK( IBEND-NB+1:IBEND,
+     $                                          J:J+1 ) ))
+                        TEMP = OVFL - BOUND
+                        IF( XNORM.GE.ONE
+     $                      .AND. TOFFNORM.GT.TEMP/XNORM ) THEN
+                           SCALE = ( OVFL * HALF / TOFFNORM ) / XNORM
+                        ELSE IF( XNORM.LT.ONE
+     $                           .AND. TOFFNORM*XNORM.GT.TEMP) THEN
+                           SCALE = OVFL * HALF / TOFFNORM
+                        ELSE
+                           SCALE = ONE
+                        END IF
+                        IF( SCALE.NE.ONE ) THEN
+                           CALL SSCAL( IMAX - JLIST(J) - 1, SCALE,
+     $                                 WORK( JLIST(J)+2, J ), 1 )
+                           CALL SSCAL( IMAX - JLIST(J) - 1, SCALE,
+     $                                 WORK( JLIST(J)+2, J+1 ), 1 )
+                           VDIAG = SCALE * VDIAG
+                           BOUND = SUM( ABS( WORK( IBEND+1 : IMAX,
+     $                                             J : J+1 ) ) )
+                           XNORM = SCALE * XNORM
+                        END IF
+                        BOUND = XNORM * TOFFNORM + BOUND
+                        VBOUNDS( J ) = BOUND
+                        VDIAGS( J:J+1, : ) = VDIAG
                      END IF
-                     CALL SSCAL( N, REMAX, WORK( 1 + (NB+K)*N ), 1 )
                   END DO
-                  CALL SLACPY( 'F', N, IV,
-     $                         WORK( 1 + (NB+1)*N ), N,
-     $                         VL( 1, KI2-IV+1 ), LDVL )
-                  IV = 1
+*
+*                 Forward substitution with block of solution.
+*
+                  NB = IBEND - IB + 1
+                  IF( IBEND.LT.IMAX )
+     $                 CALL SGEMM( 'T', 'N', IMAX - IBEND, MB, NB,
+     $                             NEGONE, T( IB, IBEND + 1 ), LDT,
+     $                             WORK( IB, JB ), N,
+     $                             ONE, WORK( IBEND + 1, JB ), N )
+                  IB = IBEND + 1
+               END DO
+*
+*              Put diagonal blocks to get triangular eigenvectors.
+*
+               DO J = JB, JBEND
+                  I = JLIST( J )
+                  SELECT CASE( VDSIZES( J ) )
+                  CASE( 1 )
+                     WORK( I, J ) = VDIAGS( J, 1 )
+                  CASE( 2 )
+                     WORK( I:I+1, J:J+1 ) = VDIAGS( J:J+1, : )
+                  END SELECT
+               END DO
+*
+*              -----------------------------------------------------
+*              Copy results to output.
+*              Note: Back transform with Schur vectors if full
+*              eigenvectors are requested.
+*     
+               IF( BACKTRANSFORM ) THEN
+                  IF( LWORK .GE. 4*N ) THEN
+*                  
+*                    Blocked back transform.
+*
+                     CALL SGEMM( 'N', 'N', N, MB, IMAX - IMIN + 1,
+     $                           ONE, VL( 1, IMIN ), LDVL,
+     $                           WORK( IMIN, JB ), N,
+     $                           ZERO, WORK( 1, JMAX + JB ), N )
+                     VL( 1 : N, JOUT : JOUT + MB - 1 )
+     $                    = WORK( 1 : N, JMAX + JB : JMAX + JBEND )
+                  ELSE
+*                    
+*                    Back transform with minimal workspace
+*                    
+                     IF( MB.EQ.2 )
+     $                    CALL SGEMV( 'N', N, IMAX - IMIN + 1,
+     $                                ONE, VL( 1, IMIN ), LDVL,
+     $                                WORK( IMIN, 2 ), 1,
+     $                                ZERO, WORK( 1, 3 ), 1 )
+                     CALL SGEMV( 'N', N, IMAX - IMIN + 1,
+     $                           ONE, VL( 1, IMIN ), LDVL,
+     $                           WORK( IMIN, 1 ), 1,
+     $                           ZERO, WORK( 1, 2 ), 1 )
+                     VL( 1 : N, JOUT : JOUT + MB - 1 )
+     $                    = WORK( 1 : N, 1 + JB : 1 + JBEND )
+                  END IF
                ELSE
-                  IV = IV + 1
+                  VL( 1 : IMIN - 1, JOUT : JOUT + MB - 1 ) = ZERO
+                  VL( IMIN : IMAX , JOUT : JOUT + MB - 1 )
+     $                 = WORK( IMIN : IMAX, JB : JBEND )
+                  VL( IMAX + 1 : N, JOUT : JOUT + MB - 1 ) = ZERO
                END IF
-            END IF ! blocked back-transform
 *
-            IS = IS + 1
-            IF( IP.NE.0 )
-     $         IS = IS + 1
-  260    CONTINUE
+*              Normalize eigenvectors.
+*
+               DO K = JB, JBEND
+                  J = JOUT + K - JB
+                  SELECT CASE( VDSIZES( K ) )
+                  CASE( 1 )
+                     SCALE = ONE / MAXVAL( ABS( VL( : , J ) ) )
+                     CALL SSCAL( N, SCALE, VL( 1, J ), 1 )
+                  CASE( 2 )
+                     BOUND = SMLNUM
+                     DO I = 1, N
+                        BOUND = MAX( BOUND,
+     $                               SUM( ABS( VL( I, J:J+1 ) ) ) )
+                     END DO
+                     SCALE = ONE / BOUND
+                     CALL SSCAL( N, SCALE, VL( 1, J ), 1 )
+                     CALL SSCAL( N, SCALE, VL( 1, J+1 ), 1 )
+                  END SELECT
+               END DO
+               JOUT = JOUT + MB
+*              
+*              Workspace is now empty.
+*
+               IMIN = N + 1
+               IMAX = N
+               JB = 1
+               JBEND = 0
+            END IF
+         END DO
       END IF
-*
+
       RETURN
 *
 *     End of STREVC3
