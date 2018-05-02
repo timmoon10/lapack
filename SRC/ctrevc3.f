@@ -451,21 +451,17 @@
 *                    Rescale solution (if needed).
 *
                      VNORM = SCASUM( NB, WORK( IB, J ), 1 )
-                     BOUNDS( J ) = BOUNDS( J ) * SCALE
                      TEMP = OVFL - BOUNDS( J )
                      IF( VNORM.GE.ONE
      $                   .AND. TOFFNORM.GT.TEMP/VNORM ) THEN
                         TEMP = ( OVFL * HALF / TOFFNORM ) / VNORM
+                        CALL CSSCAL( NB, TEMP, WORK( IB, J ), 1 )
                         SCALE = TEMP * SCALE
-                        BOUNDS( J ) = TEMP * BOUNDS( J ) + OVFL * HALF
                      ELSE IF( VNORM.LT.ONE
      $                        .AND. TOFFNORM*VNORM.GT.TEMP ) THEN
                         TEMP = OVFL * HALF / TOFFNORM
+                        CALL CSSCAL( NB, TEMP, WORK( IB, J ), 1 )
                         SCALE = TEMP * SCALE
-                        BOUNDS( J ) = TEMP * BOUNDS( J )
-     $                                + OVFL * HALF * VNORM
-                     ELSE
-                        BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                      END IF
                      IF( SCALE.NE.ONE ) THEN
                         I = MAX( JLIST( J ) - 1, IBEND )
@@ -474,7 +470,10 @@
                         CALL CSSCAL( I - IBEND, SCALE,
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
+                        BOUNDS( J ) = SCASUM( IB - IMIN,
+     $                                        WORK( IMIN, J ), 1 )
                      END IF
+                     BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                   END DO
                   DO I = IB, IBEND
                      T( I, I ) = DIAG( I - IB + 1 )
@@ -632,21 +631,19 @@
 *                    Rescale solution (if needed).
 *
                      VNORM = SCASUM( NB, WORK( I, J ), 1 )
-                     BOUNDS( J ) = BOUNDS( J ) * SCALE
                      TEMP = OVFL - BOUNDS( J )
                      IF( VNORM.GE.ONE
      $                   .AND. TOFFNORM.GT.TEMP/VNORM ) THEN
                         TEMP = ( OVFL * HALF / TOFFNORM ) / VNORM
+                        CALL CSSCAL( NB, TEMP,
+     $                               WORK( IBEND - NB + 1, J ), 1 )
                         SCALE = TEMP * SCALE
-                        BOUNDS( J ) = TEMP * BOUNDS( J ) + OVFL * HALF
                      ELSE IF( VNORM.LT.ONE
      $                        .AND. TOFFNORM*VNORM.GT.TEMP ) THEN
                         TEMP = OVFL * HALF / TOFFNORM
+                        CALL CSSCAL( NB, TEMP,
+     $                               WORK( IBEND - NB + 1, J ), 1 )
                         SCALE = TEMP * SCALE
-                        BOUNDS( J ) = TEMP * BOUNDS( J )
-     $                                + OVFL * HALF * VNORM
-                     ELSE
-                        BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                      END IF
                      IF( SCALE.NE.ONE ) THEN
                         I = MIN( JLIST( J ) + 1, IB )
@@ -655,7 +652,10 @@
                         CALL CSSCAL( IMAX - IBEND, SCALE,
      $                               WORK( IBEND + 1, J ), 1 )
                         SCALES( J ) = SCALES( J ) * SCALE
+                        BOUNDS( J ) = SCASUM( IMAX - IBEND,
+     $                                        WORK( IBEND + 1, J ), 1 )
                      END IF
+                     BOUNDS( J ) = BOUNDS( J ) + TOFFNORM * VNORM
                   END DO
                   DO I = IB, IBEND
                      T( I, I ) = DIAG( I - IB + 1 )
